@@ -66,7 +66,7 @@ If signals conflict, include multiple detections if justified (e.g., SSH brute f
 Return ONLY valid JSON (no markdown, no commentary) with exactly this shape:
 [
   {{
-    "challenge_id": "<string; use the same value as detection.attack_type unless the dataset defines another id>",
+    "challenge_id": "<string; always use the initial intrusion vector attack_type, even when post-compromise activity is folded in>",
     "detection": {{
       "attack_type": "<one of the allowed values>",
       "attacker_ips": ["<ipv4 strings, deduplicated, empty if unknown>"],
@@ -81,9 +81,10 @@ Return ONLY valid JSON (no markdown, no commentary) with exactly this shape:
 
 Rules:
 - attacker_ips: derive from incident source_ip fields when present; omit empty strings.
-- victim_accounts: usernames that appear targeted (e.g. stuffing per-user); omit generic noise if unsure.
+- victim_accounts: for credential_stuffing, use ONLY the usernames from CREDENTIAL_STUFFING_SUCCESS incidents (indicators.compromised_usernames) — targeted-but-not-compromised accounts (CREDENTIAL_STUFFING_USER_TARGETED) are NOT victims. For other attack types, use usernames that appear as confirmed targets.
 - Timestamps: merge overlapping incidents; if unclear use the widest reasonable span from the incidents or empty-window fallback "1970-01-01T00:00:00Z".
 - indicators: compact dict summarizing key signals (rule_ids, counts, distinct_usernames, etc.).
+- Attack chain: when multiple incidents share the same attacker IPs and form a logical progression (e.g. initial access → execution → exfiltration), emit a SINGLE detection for the dominant attack type and fold the secondary signals into its indicators rather than emitting separate detections.
 
 Aggregated incidents JSON:
 {incidents_blob}
