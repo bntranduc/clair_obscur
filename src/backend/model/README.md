@@ -22,45 +22,31 @@ python3 -m pip install --user -r src/backend/model/requirements-api.txt
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-### 2. Credentials AWS et variables
+### 2. Authentification AWS (profil / SSO — pas de clés dans le code)
 
-**Option A — Rôle IAM sur l’instance (recommandé)**  
-Attache un rôle avec les permissions Bedrock nécessaires (`Converse` / modèle ou profil d’inférence). Tu n’as pas besoin de clés dans `.env` pour Bedrock ; définis au minimum la région :
+Le package **`backend.model`** utilise **`boto3`** avec un **`AWS_PROFILE`** optionnel (IAM Identity Center / `aws configure sso`). **Les clés `AWS_ACCESS_KEY_*` ne sont plus passées par le code.**
+
+**En local (recommandé)** :
 
 ```bash
+aws sso login --profile bao
+export AWS_PROFILE=bao
 export AWS_REGION=eu-west-3
 export AWS_DEFAULT_REGION=eu-west-3
 ```
 
-**Option B — Clés temporaires ou utilisateur IAM**  
-Copie le modèle puis édite les valeurs (ne committe jamais `.env`) :
+(Passe **`bao`** par le nom de ton profil.)
 
-```bash
-cp .env.example .env
-nano .env
-```
+Tu peux aussi mettre `AWS_PROFILE=bao` dans un fichier `.env` à la racine du repo pour les scripts qui font `load_dotenv` (ex. tests), mais **`serve_app` ne lit pas `.env`** : pour uvicorn, exporte les variables dans le shell ou utilise systemd/docker avec `environment`.
 
-Renseigne au minimum :
+**Sur EC2 avec rôle IAM sur l’instance** : ne définis pas `AWS_PROFILE` ; boto3 utilisera automatiquement les credentials du rôle.
 
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_SESSION_TOKEN` (obligatoire pour les sessions STS / SSO / rôle assumé)
-- `AWS_REGION` / `AWS_DEFAULT_REGION` (ex. `eu-west-3`)
+Variables optionnelles pour l’API :
 
-Variables optionnelles pour l’API (`serve_app.py`) :
-
-- `BEDROCK_MODEL_ID` — sinon défaut dans le code (`bedrock_client.MODEL_ID_DEFAULT`)
+- `BEDROCK_MODEL_ID` — sinon défaut dans `bedrock_client.MODEL_ID_DEFAULT`
 - `BEDROCK_MAX_TOKENS` — défaut `4096`
 
-**Important :** `serve_app` ne charge pas automatiquement `.env`. Il faut exporter les variables dans le shell **avant** de lancer uvicorn :
-
-```bash
-set -a
-source ./.env
-set +a
-```
-
-(Vérifie que ton `.env` est au format `KEY=value`, une variable par ligne. Évite les espaces autour du `=`.)
+Voir `.env.example` à la racine du repo (sans secrets statiques).
 
 ### 3. Lancer l’API
 
@@ -126,15 +112,22 @@ docker compose -f docker-compose.model.yml up --build
 
 Arrêt : `docker compose -f docker-compose.model.yml down`.
 
-**Credentials :** le conteneur ne récupère pas automatiquement le rôle IAM de l’instance. En pratique : remplis **`AWS_*` dans `.env`** (lu par Compose), ou monte un répertoire de credentials :
+**Credentials :** avec Compose, **`~/.aws` est monté en lecture seule** et **`AWS_PROFILE`** est repris de l’hôte (profil SSO). Sur une EC2 qui ne s’authentifie **que** par rôle IAM (sans `~/.aws`), adapte ou retire le volume dans `docker-compose.model.yml`.
+
+Fais d’abord `aws sso login --profile …` sur la machine qui lance Docker, puis :
+
+```bash
+export AWS_PROFILE=bao
+docker compose -f docker-compose.model.yml up --build
+```
+
+Sans Compose :
 
 ```bash
 docker build -f src/backend/model/Dockerfile -t clair-model .
-docker run --rm -p 8080:8080 -e AWS_REGION=eu-west-3 \
+docker run --rm -p 8080:8080 -e AWS_REGION=eu-west-3 -e AWS_PROFILE=bao \
   -v ~/.aws:/root/.aws:ro clair-model
 ```
-
-Sans Compose : `docker run --rm -p 8080:8080 --env-file .env clair-model` après le `docker build` ci-dessus.
 
 ## Fichiers utiles
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Optional
+import os
+from typing import Any, Optional
 
 import boto3
 from botocore.config import Config
@@ -14,9 +15,7 @@ def bedrock_converse_text(
     region: str = "eu-west-3",
     max_tokens: int = 512,
     model_id: str = MODEL_ID_DEFAULT,
-    aws_access_key_id: Optional[str] = None,
-    aws_secret_access_key: Optional[str] = None,
-    aws_session_token: Optional[str] = None,
+    profile_name: Optional[str] = None,
 ) -> str:
     if not prompt or not prompt.strip():
         raise ValueError("prompt must be a non-empty string")
@@ -24,12 +23,13 @@ def bedrock_converse_text(
     if not (model_id or "").strip():
         model_id = MODEL_ID_DEFAULT
 
-    session = boto3.Session(
-        region_name=region,
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-        aws_session_token=aws_session_token,
-    )
+    prof = profile_name if profile_name is not None else os.getenv("AWS_PROFILE")
+    prof = (prof or "").strip() or None
+    session_kw: dict[str, Any] = {"region_name": region}
+    if prof:
+        session_kw["profile_name"] = prof
+
+    session = boto3.Session(**session_kw)
 
     client = session.client(
         "bedrock-runtime",

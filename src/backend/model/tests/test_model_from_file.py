@@ -12,6 +12,7 @@ from backend.model.predict import predict_alerts  # noqa: E402
 _ROOT = str(Path(__file__).resolve().parents[4])
 _DATA = f"{_ROOT}/datasets/dataset_test/attacks/opensearch_range_logs_ssh_bruteforce_plus2h.json"
 
+# Charge AWS_PROFILE, BEDROCK_* depuis la racine du repo — pas de clés AWS requises (SSO + aws sso login).
 load_dotenv(f"{_ROOT}/.env", override=True)
 
 

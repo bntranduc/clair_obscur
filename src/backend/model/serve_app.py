@@ -33,12 +33,14 @@ def predict(req: PredictRequest) -> PredictResponse:
     region = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "eu-west-3"))
     mid = (os.getenv("BEDROCK_MODEL_ID") or "").strip() or MODEL_ID_DEFAULT
     max_tokens = int(os.getenv("BEDROCK_MAX_TOKENS", "4096"))
+    prof = (os.getenv("AWS_PROFILE") or "").strip() or None
     try:
         alerts = predict_alerts(
             req.events,
             region=region,
             model_id=mid,
             max_tokens=max_tokens,
+            profile_name=prof,
         )
     except (json.JSONDecodeError, ValueError):
         return PredictResponse(alerts=[])

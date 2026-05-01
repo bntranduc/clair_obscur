@@ -98,9 +98,7 @@ def predict_submission_from_incidents(
     region: str = "eu-west-3",
     model_id: str = MODEL_ID_DEFAULT,
     max_tokens: int = 4096,
-    aws_access_key_id: str | None = None,
-    aws_secret_access_key: str | None = None,
-    aws_session_token: str | None = None,
+    profile_name: str | None = None,
 ) -> Any:
     allowed = tuple(allowed_attack_types or DEFAULT_ALLOWED_ATTACK_TYPES)
     prompt = build_prediction_prompt(
@@ -113,8 +111,6 @@ def predict_submission_from_incidents(
         region=region,
         max_tokens=max_tokens,
         model_id=model_id,
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-        aws_session_token=aws_session_token,
+        profile_name=profile_name,
     )
     return _extract_json_value(raw)
