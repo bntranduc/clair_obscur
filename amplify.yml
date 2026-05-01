@@ -1,12 +1,35 @@
+# Amplify Hosting — Next.js 15 (app sous src/frontend dans le repo complet).
+#
+# Fonctionne que la console Amplify soit à la racine du repo OU avec « racine monorepo » = src/frontend :
+# le script place toujours la sortie dans src/frontend/.next pour coller à baseDirectory ci‑dessous.
+#
+# Variables Amplify : voir src/frontend/.env.example et src/frontend/AMPLIFY.md
+#
 version: 1
 frontend:
   phases:
     preBuild:
       commands:
-        - cd src/frontend && nvm install 20 && nvm use 20 && node -v && npm -v && npm ci
+        - nvm install 20
+        - nvm use 20
+        - node -v && npm -v
+        - |
+            if [ -d src/frontend ]; then
+              cd src/frontend && npm ci
+            else
+              npm ci
+            fi
     build:
       commands:
-        - cd src/frontend && npm run build
+        - |
+            if [ -d src/frontend ]; then
+              cd src/frontend && npm run build
+            else
+              npm run build
+              mkdir -p src/frontend
+              rm -rf src/frontend/.next
+              mv .next src/frontend/
+            fi
   artifacts:
     baseDirectory: src/frontend/.next
     files:
@@ -14,3 +37,4 @@ frontend:
   cache:
     paths:
       - src/frontend/node_modules/**/*
+      - node_modules/**/*

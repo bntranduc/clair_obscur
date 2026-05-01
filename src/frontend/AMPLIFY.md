@@ -9,8 +9,9 @@
 
 1. Console [AWS Amplify](https://console.aws.amazon.com/amplify/) → **Create new app** → hébergement seul (sans Amplify Gen2 backend obligatoire).
 2. Connecter le **repository** et la **branche** (ex. `main`).
-3. Build : laisser **Build image** par défaut ; Amplify utilisera `amplify.yml` à la racine.
-4. **Rôle IAM** : accepter la création du rôle de service Amplify (build + hébergement compute).
+3. **Racine monorepo** : tu peux laisser **vide** (recommandé). Si tu indiques **`src/frontend`**, le `amplify.yml` à la racine du repo gère quand même `npm ci` / `npm run build` et place `.next` sous `src/frontend/.next` pour les artefacts.
+4. Build : laisser **Build image** par défaut ; Amplify utilisera `amplify.yml` à la racine.
+5. **Rôle IAM** : accepter la création du rôle de service Amplify (build + hébergement compute).
 
 ## 3. Variables d’environnement (obligatoires)
 
@@ -37,7 +38,7 @@ Le navigateur n’appelle plus l’EC2 directement pour les données : c’est l
 
 ## 5. Build & URL
 
-Pousser le commit sur la branche connectée → Amplify lance `npm ci` puis `npm run build` dans `src/frontend`.
+Pousser le commit sur la branche connectée → Amplify lance `npm ci` puis `npm run build` (depuis la racine repo ou depuis `src/frontend` selon la config monorepo ; voir `amplify.yml`).
 
 À la fin du build, l’URL du type `https://main.<id>.amplifyapp.com` sert l’app ; tester **Logs S3**, **Alertes**, **Appeler le modèle**.
 
@@ -46,6 +47,7 @@ Pousser le commit sur la branche connectée → Amplify lance `npm ci` puis `npm
 | Symptôme | Piste |
 |----------|--------|
 | Build échoue sur Node | Vérifier que `amplify.yml` utilise bien **Node 20** (`nvm install 20`). |
+| `cd: src/frontend: No such file or directory` pendant `npm run build` | Souvent la **racine monorepo** est déjà `src/frontend` : le `amplify.yml` du dépôt gère ce cas (branche conditionnelle + copie de `.next`). Pousse la dernière version du fichier et relance un build. |
 | Page 404 sur `/` | Vérifier que **artifacts.baseDirectory** est bien `src/frontend/.next` et que l’app est détectée comme Next SSR par Amplify. |
 | « Failed to fetch » / mixed content | Activer **`NEXT_PUBLIC_DASHBOARD_API_PROXY=1`** + **`DASHBOARD_API_URL`**. |
 | 502 sur `/api/dashboard-proxy/...` | `DASHBOARD_API_URL` vide ou EC2 injoignable depuis le réseau Amplify ; SG **8010**. |
