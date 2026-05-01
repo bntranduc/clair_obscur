@@ -23,8 +23,24 @@ function apiBase(): string {
   return raw.replace(/\/+$/, "");
 }
 
+/** Navigateur HTTPS → API HTTP : blocage mixed-content avant tout réseau (« Failed to fetch »). */
+function throwIfMixedContentWouldBlock(url: string): void {
+  if (typeof window === "undefined") return;
+  if (window.location.protocol !== "https:") return;
+  if (useDashboardProxy()) return;
+  const base = apiBase();
+  if (base.startsWith("http://") || url.startsWith("http://")) {
+    throw new Error(
+      "Mixed content : la page est en HTTPS mais l’API dashboard est en HTTP ; le navigateur bloque l’appel (Failed to fetch). " +
+        "Solution : définir NEXT_PUBLIC_DASHBOARD_API_PROXY=1 et DASHBOARD_API_URL (URL EC2:8010) côté serveur Next.js / Amplify. " +
+        "Voir src/frontend/.env.example."
+    );
+  }
+}
+
 /** Évite le vague « Failed to fetch » avec un message exploitable. */
 async function dashboardFetch(url: string): Promise<Response> {
+  throwIfMixedContentWouldBlock(url);
   try {
     return await fetch(url, { cache: "no-store" });
   } catch (e) {
@@ -35,7 +51,13 @@ async function dashboardFetch(url: string): Promise<Response> {
           `Détails : ${msg}`
       );
     }
-    throw new Error(`API injoignable (${apiBase()}). Vérifie EC2, security group :8010, credentials S3. Détails : ${msg}`);
+    const hint =
+      typeof window !== "undefined" && window.location.protocol === "https:"
+        ? " Si tu es sur un site HTTPS (ex. Amplify), utilise le proxy (NEXT_PUBLIC_DASHBOARD_API_PROXY=1)."
+        : "";
+    throw new Error(
+      `API injoignable (${apiBase()}). Vérifie EC2, security group :8010, CORS.${hint} Détails : ${msg}`
+    );
   }
 }
 

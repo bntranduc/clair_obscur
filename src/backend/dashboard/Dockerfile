@@ -1,8 +1,14 @@
 # API dashboard FastAPI (logs S3, alertes prédictions).
 # Build depuis la racine du repo :
 #   docker build -f src/backend/dashboard/Dockerfile -t clair-dashboard:latest .
-# Run (ajouter AWS_* ou IAM ; CORS : DASHBOARD_CORS_ORIGINS=https://....amplifyapp.com) :
+# Run — région + CORS (ex. DASHBOARD_CORS_ORIGINS=https://….amplifyapp.com) :
 #   docker run --rm -p 8010:8010 -e AWS_REGION=eu-west-3 clair-dashboard:latest
+#
+# Clés AWS dans le conteneur (S3) — depuis un shell où tu as déjà exporté les variables :
+#   sudo -E docker run --rm -p 8010:8010 \
+#     -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN \
+#     -e AWS_REGION=eu-west-3 \
+#     clair-dashboard:latest
 #
 # Proxy vers le conteneur modèle sur le même hôte (bridge Linux) :
 #   -e PREDICT_API_URL=http://172.17.0.1:8080
