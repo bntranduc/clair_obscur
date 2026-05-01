@@ -5,6 +5,15 @@ keys/
 .env
 .env.*
 !.env.example
+# direnv / exports locaux souvent avec AWS_* ou tokens
+.envrc
+.direnv/
+# copie accidentelle de ~/.aws à la racine du repo
+.aws/
+
+# Compose / overrides locaux avec secrets
+docker-compose.override.yml
+**/docker-compose.override.yml
 
 # --- Python ---
 __pycache__/

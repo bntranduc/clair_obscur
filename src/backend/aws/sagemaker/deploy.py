@@ -19,7 +19,7 @@ def deploy_sklearn_endpoint(
     instance_type: str = "ml.m5.large",
     initial_instance_count: int = 1,
     framework_version: str = "1.2-1",
-    py_version: str = "py310",
+    py_version: str = "py3",
     source_dir: Path | None = None,
     entry_point: str = "backend/aws/sagemaker/inference.py",
     env: dict[str, str] | None = None,

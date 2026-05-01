@@ -30,7 +30,7 @@ def _cmd_deploy(ap: argparse.ArgumentParser) -> None:
     ap.add_argument("--endpoint-name", required=True)
     ap.add_argument("--instance-type", default="ml.m5.large")
     ap.add_argument("--framework-version", default="1.2-1")
-    ap.add_argument("--py-version", default="py310")
+    ap.add_argument("--py-version", default="py3")
     ap.add_argument("--source-dir", type=Path, default=None, help="Default: repo src/")
     ap.add_argument("--region", default=os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION"))
 
