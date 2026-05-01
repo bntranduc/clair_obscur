@@ -1,7 +1,7 @@
 # API dashboard FastAPI (logs S3, alertes prédictions).
 # Build depuis la racine du repo :
 #   docker build -f src/backend/dashboard/Dockerfile -t clair-dashboard:latest .
-# Run :
+# Run (ajouter AWS_* ou IAM ; CORS : DASHBOARD_CORS_ORIGINS=https://....amplifyapp.com) :
 #   docker run --rm -p 8010:8010 -e AWS_REGION=eu-west-3 clair-dashboard:latest
 
 FROM python:3.12-slim-bookworm

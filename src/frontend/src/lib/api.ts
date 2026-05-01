@@ -1,23 +1,29 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-/** Défaut dev local. Prod / EC2 : ``NEXT_PUBLIC_DASHBOARD_API_URL`` ou proxy Amplify (voir ``.env.example``). */
-const DEFAULT_API = "http://127.0.0.1:8010";
-
 /** Si ``1`` : appels navigateur vers ``/api/dashboard-proxy/...`` (serveur → EC2 HTTP, pas de mixed content). */
 function useDashboardProxy(): boolean {
   return process.env.NEXT_PUBLIC_DASHBOARD_API_PROXY === "1";
 }
 
-/** Base pour les URLs d’API : URL absolue locale/prod, ou préfixe proxy même-origine. */
+/**
+ * Base pour les URLs d’API : pas de fallback localhost — uniquement variables d’environnement
+ * (URL publique EC2 ou proxy Amplify).
+ */
 function apiBase(): string {
   if (useDashboardProxy()) {
     return "/api/dashboard-proxy";
   }
-  const raw = process.env.NEXT_PUBLIC_DASHBOARD_API_URL || DEFAULT_API;
+  const raw = process.env.NEXT_PUBLIC_DASHBOARD_API_URL?.trim();
+  if (!raw) {
+    throw new Error(
+      "NEXT_PUBLIC_DASHBOARD_API_URL est obligatoire (URL publique du dashboard API, ex. http://ec2-….amazonaws.com:8010). " +
+        "Sur Amplify en HTTPS : NEXT_PUBLIC_DASHBOARD_API_PROXY=1 et DASHBOARD_API_URL côté serveur. Voir src/frontend/.env.example."
+    );
+  }
   return raw.replace(/\/+$/, "");
 }
 
-/** Évite le vague « Failed to fetch » : indique URL + commande backend locale. */
+/** Évite le vague « Failed to fetch » avec un message exploitable. */
 async function dashboardFetch(url: string): Promise<Response> {
   try {
     return await fetch(url, { cache: "no-store" });
@@ -25,15 +31,11 @@ async function dashboardFetch(url: string): Promise<Response> {
     const msg = e instanceof Error ? e.message : String(e);
     if (useDashboardProxy()) {
       throw new Error(
-        `Proxy dashboard injoignable. Sur Amplify, définis DASHBOARD_API_URL (URL interne http://EC2:8010). ` +
+        `Proxy dashboard injoignable. Définis DASHBOARD_API_URL (http://EC2:8010) côté serveur Amplify / runtime. ` +
           `Détails : ${msg}`
       );
     }
-    throw new Error(
-      `API injoignable (${apiBase()}). Lance le backend : depuis la racine du dépôt, ` +
-        `\`bash scripts/run_dashboard_api.sh\` (puis \`cd src/frontend && npm run dev\`). ` +
-        `Détails : ${msg}`
-    );
+    throw new Error(`API injoignable (${apiBase()}). Vérifie EC2, security group :8010, credentials S3. Détails : ${msg}`);
   }
 }
 
