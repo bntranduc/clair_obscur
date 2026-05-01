@@ -106,8 +106,9 @@ def main() -> int:
         "--model-id",
         default=MODEL_ID_DEFAULT,
         help=(
-            "Bedrock modelId. If on-demand isn't supported, pass an inference profile ID/ARN. "
-            f"Default: {MODEL_ID_DEFAULT}. Guide model id: {GUIDE_MODEL_ID}"
+            "modelId Converse. Sur eu-west-3, l’ID foundation anthropic.* déclenche souvent "
+            '"on-demand throughput isn’t supported" ; utiliser le profil EU, ex. '
+            f"{MODEL_ID_DEFAULT}. ID guide (sans profil) : {GUIDE_MODEL_ID}"
         ),
     )
     ap.add_argument("--max-tokens", type=int, default=256, help="Max tokens for the response.")

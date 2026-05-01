@@ -74,7 +74,9 @@ def predictions_to_alerts(pred: Any) -> list[dict[str, Any]]:
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    """Statut + modèle Bedrock résolu (utile pour vérifier le déploiement)."""
+    resolved = (os.getenv("BEDROCK_MODEL_ID") or "").strip() or MODEL_ID_DEFAULT
+    return {"status": "ok", "bedrock_model_id": resolved}
 
 
 @app.post("/predict", response_model=PredictResponse)
