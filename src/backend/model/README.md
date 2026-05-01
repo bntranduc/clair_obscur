@@ -124,12 +124,12 @@ Sans le script :
 
 ```bash
 docker compose -f docker-compose.model.yml up --build
-docker compose -f docker-compose.model.yml --profile sqs up --build
+docker compose --profile sqs -f docker-compose.model.yml up --build
 ```
 
 Si la sous-commande `compose` n’existe pas sur ton EC2, installe le plugin Docker Compose ou utilise uniquement `docker build` / `docker run` (voir message d’erreur du script).
 
-**Credentials :** avec Compose, **`~/.aws` est monté en lecture seule** et **`AWS_PROFILE`** est repris de l’hôte (profil SSO). Sur une EC2 qui ne s’authentifie **que** par rôle IAM (sans `~/.aws`), adapte ou retire le volume dans `docker-compose.model.yml`.
+**Credentials :** avec Compose, **`~/.aws` est monté depuis l’hôte** (écriture nécessaire pour le cache SSO sous `~/.aws/sso/cache`) et **`AWS_PROFILE`** est repris de l’hôte. Sur une EC2 qui ne s’authentifie **que** par rôle IAM (sans `~/.aws`), adapte ou retire le volume dans `docker-compose.model.yml`.
 
 Fais d’abord `aws sso login --profile …` sur la machine qui lance Docker, puis :
 
@@ -143,7 +143,7 @@ Sans Compose :
 ```bash
 docker build -f src/backend/model/Dockerfile -t clair-model .
 docker run --rm -p 8080:8080 -e AWS_REGION=eu-west-3 -e AWS_PROFILE=bao \
-  -v ~/.aws:/root/.aws:ro clair-model
+  -v ~/.aws:/root/.aws clair-model
 ```
 
 ## Fichiers utiles
