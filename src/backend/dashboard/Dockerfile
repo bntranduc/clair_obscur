@@ -3,6 +3,9 @@
 #   docker build -f src/backend/dashboard/Dockerfile -t clair-dashboard:latest .
 # Run (ajouter AWS_* ou IAM ; CORS : DASHBOARD_CORS_ORIGINS=https://....amplifyapp.com) :
 #   docker run --rm -p 8010:8010 -e AWS_REGION=eu-west-3 clair-dashboard:latest
+#
+# Proxy vers le conteneur modèle sur le même hôte (bridge Linux) :
+#   -e PREDICT_API_URL=http://172.17.0.1:8080
 
 FROM python:3.12-slim-bookworm
 

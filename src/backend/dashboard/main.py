@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend.api import config
-from backend.api.endpoints import alerts, logs, meta
+from backend.api.endpoints import alerts, logs, meta, model_predict
 
 
 class AllowPrivateNetworkMiddleware(BaseHTTPMiddleware):
@@ -34,3 +34,4 @@ app.include_router(meta.router)
 app.include_router(logs.router, prefix=f"{config.API_V1_PREFIX}/logs")
 app.include_router(alerts.router_main, prefix=f"{config.API_V1_PREFIX}/alerts")
 app.include_router(alerts.router_tmp, prefix=f"{config.API_V1_PREFIX}/alerts-tmp")
+app.include_router(model_predict.router, prefix=f"{config.API_V1_PREFIX}/model")
