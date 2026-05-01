@@ -1,5 +1,10 @@
 # AWS Amplify Hosting — app Next.js dans src/frontend (monorepo).
-# Console : région eu-west-3, branche Git, variables d’env (voir src/frontend/.env.example).
+# Console : région eu-west-3, branche Git.
+#
+# Variables d’environnement (Hosting → Variables → rebuild) pour EC2 HTTP derrière HTTPS :
+#   NEXT_PUBLIC_DASHBOARD_API_PROXY=1
+#   DASHBOARD_API_URL=http://ec2-....eu-west-3.compute.amazonaws.com:8010
+# Détail : src/frontend/.env.example
 version: 1
 applications:
   - appRoot: src/frontend

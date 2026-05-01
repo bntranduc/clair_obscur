@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+/** Défaut dev local. Prod / EC2 : ``NEXT_PUBLIC_DASHBOARD_API_URL`` ou proxy Amplify (voir ``.env.example``). */
 const DEFAULT_API = "http://127.0.0.1:8010";
 
 /** Si ``1`` : appels navigateur vers ``/api/dashboard-proxy/...`` (serveur → EC2 HTTP, pas de mixed content). */
