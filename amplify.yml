@@ -1,0 +1,23 @@
+# AWS Amplify Hosting — app Next.js dans src/frontend (monorepo).
+# Console : région eu-west-3, branche Git, variables d’env (voir src/frontend/.env.example).
+version: 1
+applications:
+  - appRoot: src/frontend
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - nvm install 20
+            - nvm use 20
+            - node -v && npm -v
+            - npm ci
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: .next
+        files:
+          - "**/*"
+      cache:
+        paths:
+          - node_modules/**/*

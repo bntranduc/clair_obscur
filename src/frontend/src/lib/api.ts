@@ -2,7 +2,16 @@
 
 const DEFAULT_API = "http://127.0.0.1:8010";
 
+/** Si ``1`` : appels navigateur vers ``/api/dashboard-proxy/...`` (serveur → EC2 HTTP, pas de mixed content). */
+function useDashboardProxy(): boolean {
+  return process.env.NEXT_PUBLIC_DASHBOARD_API_PROXY === "1";
+}
+
+/** Base pour les URLs d’API : URL absolue locale/prod, ou préfixe proxy même-origine. */
 function apiBase(): string {
+  if (useDashboardProxy()) {
+    return "/api/dashboard-proxy";
+  }
   const raw = process.env.NEXT_PUBLIC_DASHBOARD_API_URL || DEFAULT_API;
   return raw.replace(/\/+$/, "");
 }
@@ -13,6 +22,12 @@ async function dashboardFetch(url: string): Promise<Response> {
     return await fetch(url, { cache: "no-store" });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    if (useDashboardProxy()) {
+      throw new Error(
+        `Proxy dashboard injoignable. Sur Amplify, définis DASHBOARD_API_URL (URL interne http://EC2:8010). ` +
+          `Détails : ${msg}`
+      );
+    }
     throw new Error(
       `API injoignable (${apiBase()}). Lance le backend : depuis la racine du dépôt, ` +
         `\`bash scripts/run_dashboard_api.sh\` (puis \`cd src/frontend && npm run dev\`). ` +
