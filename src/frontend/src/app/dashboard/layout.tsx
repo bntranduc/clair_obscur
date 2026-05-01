@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, LayoutDashboard, Bell, FlaskConical } from "lucide-react";
+import { Search, LayoutDashboard, Bell, FlaskConical, Cpu } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -25,6 +25,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </p>
           <NavLink href="/dashboard/alerts" icon={<Bell size={18} />} label="Alertes" />
           <NavLink href="/dashboard/alerts-tmp" icon={<FlaskConical size={18} />} label="Alertes (TMP)" />
+          <NavLink href="/dashboard/call-model" icon={<Cpu size={18} />} label="Appeler le modèle" />
         </nav>
       </aside>
       <main className="flex-1 overflow-auto bg-gradient-to-br from-black to-gray-950 relative">
@@ -39,6 +40,7 @@ function navActive(pathname: string, href: string): boolean {
   if (pathname === href) return true;
   if (!pathname.startsWith(href)) return false;
   if (href === "/dashboard/alerts" && pathname.startsWith("/dashboard/alerts-tmp")) return false;
+  if (href === "/dashboard/call-model") return pathname === "/dashboard/call-model";
   return pathname.startsWith(`${href}/`);
 }
 

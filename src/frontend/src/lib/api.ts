@@ -61,6 +61,53 @@ async function dashboardFetch(url: string): Promise<Response> {
   }
 }
 
+async function dashboardFetchPost(url: string, jsonBody: unknown): Promise<Response> {
+  throwIfMixedContentWouldBlock(url);
+  try {
+    return await fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(jsonBody),
+      cache: "no-store",
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (useDashboardProxy()) {
+      throw new Error(
+        `Proxy dashboard injoignable. Définis DASHBOARD_API_URL (http://EC2:8010) côté serveur Amplify / runtime. ` +
+          `Détails : ${msg}`
+      );
+    }
+    const hint =
+      typeof window !== "undefined" && window.location.protocol === "https:"
+        ? " Si tu es sur un site HTTPS (ex. Amplify), utilise NEXT_PUBLIC_DASHBOARD_API_PROXY=1."
+        : "";
+    throw new Error(
+      `API injoignable (${apiBase()}). Vérifie EC2, security group :8010, CORS.${hint} Détails : ${msg}`
+    );
+  }
+}
+
+/** Appelle ``POST /api/v1/model/predict`` (proxy dashboard → service modèle). */
+export async function callModelPredict(
+  events: Record<string, unknown>[]
+): Promise<Record<string, unknown>> {
+  const url = `${apiBase()}/api/v1/model/predict`;
+  const res = await dashboardFetchPost(url, { events });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`predict failed ${res.status}: ${text}`);
+  }
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new Error(`predict: réponse non-JSON: ${text.slice(0, 500)}`);
+  }
+}
+
 export type S3ObjectInfo = {
   key: string;
   size: number;

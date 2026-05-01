@@ -24,6 +24,11 @@ export default function DashboardHome() {
             → Alertes TMP (model-attacks-predictions-tmp)
           </Link>
         </li>
+        <li>
+          <Link href="/dashboard/call-model" className="hover:text-indigo-300 underline">
+            → Appeler le modèle (JSON → prédictions)
+          </Link>
+        </li>
       </ul>
     </div>
   );
