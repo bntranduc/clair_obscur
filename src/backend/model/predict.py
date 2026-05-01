@@ -12,12 +12,10 @@ from backend.model.rules.rules_window import detect_signals_window_1h
 def predict_alerts(
     events: Sequence[NormalizedEvent],
     *,
-    aws_access_key_id: str | None = None,
-    aws_secret_access_key: str | None = None,
-    aws_session_token: str | None = None,
     region: str = "eu-west-3",
     model_id: str | None = None,
     max_tokens: int = 4096,
+    profile_name: str | None = None,
 ) -> list[dict[str, Any]]:
     incidents = aggregate_signals(detect_signals_window_1h(events))
     if not incidents:
@@ -28,9 +26,7 @@ def predict_alerts(
         region=region,
         model_id=model_id or MODEL_ID_DEFAULT,
         max_tokens=max_tokens,
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-        aws_session_token=aws_session_token,
+        profile_name=profile_name,
     )
     if isinstance(out, list):
         return [x for x in out if isinstance(x, dict)]
