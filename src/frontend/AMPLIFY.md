@@ -9,7 +9,7 @@
 
 1. Console [AWS Amplify](https://console.aws.amazon.com/amplify/) → **Create new app** → hébergement seul (sans Amplify Gen2 backend obligatoire).
 2. Connecter le **repository** et la **branche** (ex. `main`).
-3. **Racine monorepo** : tu peux laisser **vide** (recommandé). Si tu indiques **`src/frontend`**, le `amplify.yml` à la racine du repo gère quand même `npm ci` / `npm run build` et place `.next` sous `src/frontend/.next` pour les artefacts.
+3. **Racine monorepo** : tu peux laisser **vide** ou mettre **`src/frontend`** — le `amplify.yml` déplace toujours `.next` à la racine du clone pour les artefacts (`baseDirectory: .next`).
 4. Build : laisser **Build image** par défaut ; Amplify utilisera `amplify.yml` à la racine.
 5. **Rôle IAM** : accepter la création du rôle de service Amplify (build + hébergement compute).
 
@@ -47,7 +47,8 @@ Pousser le commit sur la branche connectée → Amplify lance `npm ci` puis `npm
 | Symptôme | Piste |
 |----------|--------|
 | Build échoue sur Node | Vérifier que `amplify.yml` utilise bien **Node 20** (`nvm install 20`). |
-| `cd: src/frontend: No such file or directory` pendant `npm run build` | Souvent la **racine monorepo** est déjà `src/frontend` : le `amplify.yml` du dépôt gère ce cas (branche conditionnelle + copie de `.next`). Pousse la dernière version du fichier et relance un build. |
-| Page 404 sur `/` | Vérifier que **artifacts.baseDirectory** est bien `src/frontend/.next` et que l’app est détectée comme Next SSR par Amplify. |
+| `cd: src/frontend: No such file or directory` pendant `npm run build` | Corrigé dans les derniers `amplify.yml` (build conditionnel). Met à jour le dépôt et relance un build. |
+| `Artifact directory doesn't exist: src/frontend/.next` | Amplify avec racine monorepo `src/frontend` résolvait un mauvais chemin ; le YAML déplace maintenant `.next` à la racine (`baseDirectory: .next`). Pousse le dernier commit. |
+| Page 404 sur `/` | Vérifier SSR / compute Next et les logs de déploiement Amplify. |
 | « Failed to fetch » / mixed content | Activer **`NEXT_PUBLIC_DASHBOARD_API_PROXY=1`** + **`DASHBOARD_API_URL`**. |
 | 502 sur `/api/dashboard-proxy/...` | `DASHBOARD_API_URL` vide ou EC2 injoignable depuis le réseau Amplify ; SG **8010**. |
