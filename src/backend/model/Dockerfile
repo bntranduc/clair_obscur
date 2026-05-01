@@ -14,4 +14,4 @@ COPY src /app/src
 RUN pip install --no-cache-dir -r /app/src/backend/model/requirements-api.txt
 
 EXPOSE 8080
-CMD ["uvicorn", "backend.model.serve_app:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["python3", "-m", "uvicorn", "backend.model.serve_app:app", "--host", "0.0.0.0", "--port", "8080"]
