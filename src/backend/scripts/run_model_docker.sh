@@ -1,32 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Lance l’API modèle via Docker (racine du dépôt).
-# Avant : aws sso login --profile … puis export AWS_PROFILE=… (sauf rôle IAM seul sur EC2).
+# Lance l’API modèle (service ``model``). Ajoute le worker SQS avec le profil Compose ``sqs``.
 #
-# Usage :
-#   ./src/backend/scripts/run_model_docker.sh       # premier plan
-#   ./src/backend/scripts/run_model_docker.sh -d    # détaché
+# Exemples :
+#   ./src/backend/scripts/run_model_docker.sh
+#   ./src/backend/scripts/run_model_docker.sh --profile sqs
+#   ./src/backend/scripts/run_model_docker.sh --profile sqs -d
+#
+# Prérequis AWS : aws sso login + export AWS_PROFILE=… ; SQS_QUEUE_URL dans .env pour le worker.
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 cd "$ROOT"
 COMPOSE_FILE=docker-compose.model.yml
 
-DETACH=()
-[[ "${1:-}" == "-d" ]] && DETACH=(-d)
+if docker compose version >/dev/null 2>&1; then
+  exec docker compose -f "$COMPOSE_FILE" up --build "$@"
+elif command -v docker-compose >/dev/null 2>&1; then
+  exec docker-compose -f "$COMPOSE_FILE" up --build "$@"
+fi
 
-_run() {
-  if docker compose version >/dev/null 2>&1; then
-    docker compose -f "$COMPOSE_FILE" up --build "${DETACH[@]}"
-  elif command -v docker-compose >/dev/null 2>&1; then
-    docker-compose -f "$COMPOSE_FILE" up --build "${DETACH[@]}"
-  else
-    echo "Docker Compose introuvable. Installe le plugin ou docker-compose." >&2
-    echo "Alternative :" >&2
-    echo "  docker build -f src/backend/model/Dockerfile -t clair-model ." >&2
-    echo "  docker run --rm -p 8080:8080 -e AWS_REGION=eu-west-3 -e AWS_PROFILE=\${AWS_PROFILE:-} \\" >&2
-    echo "    -v \"\$HOME/.aws:/root/.aws:ro\" clair-model" >&2
-    exit 1
-  fi
-}
-
-_run
+echo "Docker Compose introuvable." >&2
+exit 1
