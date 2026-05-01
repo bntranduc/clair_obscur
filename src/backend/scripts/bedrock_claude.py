@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from typing import Optional
 
 import boto3
@@ -27,11 +28,11 @@ def call_bedrock_claude_opus_4_6(
     aws_session_token: Optional[str] = None,
 ) -> str:
     """
-    Call Claude Opus 4.6 on AWS Bedrock (Converse API) and return plain text.
+    Call Claude on AWS Bedrock (Converse API) and return plain text.
 
-    Credentials:
-    - Prefer using AWS SSO or env vars (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN).
-    - You may also pass credentials explicitly to this function.
+    Credentials: si les trois paramètres optionnels sont None, boto3 utilise sa chaîne par défaut
+    (variables d'environnement sans lecture explicite, profil ~/.aws, rôle instance, etc.).
+    Pour forcer des clés explicites, les passer telles quelles (comme le fait ``main()``).
     """
     if not prompt or not prompt.strip():
         raise ValueError("prompt must be a non-empty string")
@@ -73,8 +74,34 @@ def call_bedrock_claude_opus_4_6(
     return "".join(texts).strip()
 
 
+def credentials_from_env_strict() -> tuple[str, str, Optional[str]]:
+    """
+    Lit uniquement les variables d'environnement (pas de chaîne IAM instance / ~/.aws par défaut).
+
+    Obligatoires : AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+    Optionnel : AWS_SESSION_TOKEN (requis pour les clés temporaires STS).
+    """
+    key_id = (os.environ.get("AWS_ACCESS_KEY_ID") or "").strip()
+    secret = (os.environ.get("AWS_SECRET_ACCESS_KEY") or "").strip()
+    token_raw = (os.environ.get("AWS_SESSION_TOKEN") or "").strip()
+    token: Optional[str] = token_raw if token_raw else None
+    if not key_id or not secret:
+        raise SystemExit(
+            "Ce script n'utilise pas le rôle instance ni la chaîne de credentials par défaut.\n"
+            "Exporte AWS_ACCESS_KEY_ID et AWS_SECRET_ACCESS_KEY "
+            "(et AWS_SESSION_TOKEN si les clés sont temporaires)."
+        )
+    return key_id, secret, token
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Test Bedrock Claude via Converse API.")
+    ap = argparse.ArgumentParser(
+        description=(
+            "Test Bedrock Claude via Converse API. "
+            "Utilise uniquement AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY "
+            "(et AWS_SESSION_TOKEN optionnel) depuis l'environnement."
+        )
+    )
     ap.add_argument("--prompt", default="HELLO", help="Prompt text.")
     ap.add_argument("--region", default="eu-west-3", help="AWS region (default: eu-west-3).")
     ap.add_argument(
@@ -88,11 +115,15 @@ def main() -> int:
     ap.add_argument("--max-tokens", type=int, default=256, help="Max tokens for the response.")
     args = ap.parse_args()
 
+    ak, sk, st = credentials_from_env_strict()
     out = call_bedrock_claude_opus_4_6(
         args.prompt,
         region=args.region,
         max_tokens=args.max_tokens,
         model_id=args.model_id,
+        aws_access_key_id=ak,
+        aws_secret_access_key=sk,
+        aws_session_token=st,
     )
     print(out)
     return 0

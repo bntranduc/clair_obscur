@@ -1,30 +1,16 @@
-# AWS Amplify Hosting — app Next.js dans src/frontend (monorepo).
-# Console : région eu-west-3, branche Git.
-#
-# Variables d’environnement (Hosting → Variables → rebuild). Pas de fallback localhost dans le front :
-#   Mode proxy (HTTPS Amplify → EC2) :
-#     NEXT_PUBLIC_DASHBOARD_API_PROXY=1
-#     DASHBOARD_API_URL=http://ec2-....eu-west-3.compute.amazonaws.com:8010
-#   Mode direct navigateur → EC2 : NEXT_PUBLIC_DASHBOARD_API_URL=http://ec2-....:8010
-# Détail : src/frontend/.env.example
 version: 1
-applications:
-  - appRoot: src/frontend
-    frontend:
-      phases:
-        preBuild:
-          commands:
-            - nvm install 20
-            - nvm use 20
-            - node -v && npm -v
-            - npm ci
-        build:
-          commands:
-            - npm run build
-      artifacts:
-        baseDirectory: .next
-        files:
-          - "**/*"
-      cache:
-        paths:
-          - node_modules/**/*
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - cd src/frontend && nvm install 20 && nvm use 20 && node -v && npm -v && npm ci
+    build:
+      commands:
+        - cd src/frontend && npm run build
+  artifacts:
+    baseDirectory: src/frontend/.next
+    files:
+      - "**/*"
+  cache:
+    paths:
+      - src/frontend/node_modules/**/*
