@@ -1,0 +1,55 @@
+# --- Secrets & credentials (ne jamais committer) ---
+keys/
+*.pem
+*.ppk
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+*.egg-info/
+.eggs/
+dist/
+build/
+pip-wheel-metadata/
+
+# --- Tests / linters ---
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Artefacts ML locaux (gros fichiers) ---
+# Déjà couverts sous predictors/ par predictors/.gitignore ; sécurité si copies ailleurs :
+*.joblib
+
+# Archives SageMaker / modèles packagés (souvent volumineuses)
+model.tar.gz
+**/model.tar.gz
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# --- Logs & tmp projet ---
+*.log
+/tmp/
+
+datasets/
+src/backend/model/attack_predictor/predictors/
+
+archives/
