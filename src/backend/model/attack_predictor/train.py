@@ -39,12 +39,12 @@ from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
-from backend.model.attack_predictor.features import event_to_feature_vector, feature_names
-from backend.model.attack_predictor.labels import (
+from features import event_to_feature_vector, feature_names
+from labels import (
     load_attack_types_from_ground_truth,
     validate_labels_against_ground_truth,
 )
-from backend.model.attack_predictor.paths import DEFAULT_LOCAL_MODEL_DIR
+from paths import DEFAULT_LOCAL_MODEL_DIR
 
 _ARTIFACT_MODEL = "model.joblib"
 _ARTIFACT_ENCODER = "label_encoder.joblib"

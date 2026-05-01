@@ -11,14 +11,11 @@ Response JSON includes ``predictions`` list with ``predicted_attack_type`` and `
 """
 
 from __future__ import annotations
-
 import json
 from typing import Any
-
 import numpy as np
-
-from backend.model.attack_predictor.features import event_to_feature_vector
-from backend.model.attack_predictor.predictor import AttackPredictor
+from features import event_to_feature_vector
+from predictor import AttackPredictor
 
 _predictor: AttackPredictor | None = None
 

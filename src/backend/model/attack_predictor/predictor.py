@@ -9,7 +9,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import LabelEncoder
 
-from backend.model.attack_predictor.features import event_to_feature_vector
+from features import event_to_feature_vector
 
 _ARTIFACT_MODEL = "model.joblib"
 _ARTIFACT_ENCODER = "label_encoder.joblib"
