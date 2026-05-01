@@ -1,11 +1,3 @@
-# Amplify Hosting — Next.js 15 (app sous src/frontend/).
-#
-# Après le build, .next est à la racine du clone (baseDirectory: .next). Une copie
-# sous src/frontend/.next est aussi créée : selon la config monorepo, Amplify peut
-# résoudre l’artefact depuis la racine du repo ou depuis src/frontend.
-#
-# Variables Amplify : voir src/frontend/.env.example et src/frontend/AMPLIFY.md
-#
 version: 1
 frontend:
   phases:
@@ -24,16 +16,12 @@ frontend:
       commands:
         - |
             if [ -d src/frontend ]; then
-              (cd src/frontend && npm run build)
-              rm -rf .next
-              mv src/frontend/.next .next
-              rm -rf src/frontend/.next
-              cp -a .next src/frontend/.next
+              cd src/frontend && npm run build
             else
               npm run build
             fi
   artifacts:
-    baseDirectory: .next
+    baseDirectory: src/frontend/.next
     files:
       - "**/*"
   cache:
