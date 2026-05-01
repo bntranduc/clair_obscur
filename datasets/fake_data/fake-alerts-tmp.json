@@ -1,0 +1,211 @@
+{
+  "alerts": [
+    {
+      "_index": "ground-truth-ds1",
+      "_id": "fake-tmp-ssh-01",
+      "_score": null,
+      "_source": {
+        "dataset": 1,
+        "challenge_id": "ssh_brute_force",
+        "attack_type": "ssh_brute_force",
+        "attacker_ips": ["198.51.100.10"],
+        "victim_accounts": ["svc_backup"],
+        "attack_window": {
+          "start": "2026-05-01T08:00:00Z",
+          "end": "2026-05-01T09:30:00Z"
+        },
+        "indicators": {"fake": true, "failed_ssh": "~120"},
+        "sources_needed": ["authentication", "network"],
+        "points_max": 50
+      },
+      "sort": ["fake-tmp-ssh-01"]
+    },
+    {
+      "_index": "ground-truth-ds1",
+      "_id": "fake-tmp-cred-02",
+      "_score": null,
+      "_source": {
+        "dataset": 1,
+        "challenge_id": "credential_stuffing",
+        "attack_type": "credential_stuffing",
+        "attacker_ips": ["203.0.113.20"],
+        "victim_accounts": ["alice", "bob"],
+        "attack_window": {
+          "start": "2026-05-01T10:00:00Z",
+          "end": "2026-05-01T11:00:00Z"
+        },
+        "indicators": {"fake": true, "failed_logins": "~800"},
+        "sources_needed": ["authentication", "application"],
+        "points_max": 60
+      },
+      "sort": ["fake-tmp-cred-02"]
+    },
+    {
+      "_index": "ground-truth-ds1",
+      "_id": "fake-tmp-sqli-03",
+      "_score": null,
+      "_source": {
+        "dataset": 1,
+        "challenge_id": "sql_injection",
+        "attack_type": "sql_injection",
+        "attacker_ips": ["198.51.100.33"],
+        "victim_accounts": [],
+        "attack_window": {
+          "start": "2026-05-01T12:00:00Z",
+          "end": "2026-05-01T13:15:00Z"
+        },
+        "indicators": {"fake": true, "uri_samples": ["/api/search?q=1' OR 1=1--"]},
+        "sources_needed": ["application"],
+        "points_max": 70
+      },
+      "sort": ["fake-tmp-sqli-03"]
+    },
+    {
+      "_index": "ground-truth-ds1",
+      "_id": "fake-tmp-trav-04",
+      "_score": null,
+      "_source": {
+        "dataset": 1,
+        "challenge_id": "directory_traversal",
+        "attack_type": "directory_traversal",
+        "attacker_ips": ["185.220.101.99"],
+        "victim_accounts": [],
+        "attack_window": {
+          "start": "2026-05-01T14:00:00Z",
+          "end": "2026-05-01T14:45:00Z"
+        },
+        "indicators": {"fake": true, "patterns": ["../../../etc/passwd"]},
+        "sources_needed": ["application", "network"],
+        "points_max": 55
+      },
+      "sort": ["fake-tmp-trav-04"]
+    },
+    {
+      "_index": "ground-truth-ds1",
+      "_id": "fake-tmp-ssrf-05",
+      "_score": null,
+      "_source": {
+        "dataset": 1,
+        "challenge_id": "ssrf",
+        "attack_type": "ssrf",
+        "attacker_ips": ["203.0.113.7"],
+        "victim_accounts": [],
+        "attack_window": {
+          "start": "2026-05-01T15:00:00Z",
+          "end": "2026-05-01T16:00:00Z"
+        },
+        "indicators": {"fake": true, "ssrf_targets": ["169.254.169.254"]},
+        "sources_needed": ["application", "network"],
+        "points_max": 65
+      },
+      "sort": ["fake-tmp-ssrf-05"]
+    },
+    {
+      "_index": "ground-truth-ds1",
+      "_id": "fake-tmp-exfil-06",
+      "_score": null,
+      "_source": {
+        "dataset": 1,
+        "challenge_id": "exfiltration",
+        "attack_type": "exfiltration",
+        "attacker_ips": ["10.0.5.12"],
+        "victim_accounts": ["batch_etl"],
+        "attack_window": {
+          "start": "2026-05-01T17:00:00Z",
+          "end": "2026-05-01T19:00:00Z"
+        },
+        "indicators": {"fake": true, "egress_bytes": "~12MB"},
+        "sources_needed": ["network", "system"],
+        "points_max": 80
+      },
+      "sort": ["fake-tmp-exfil-06"]
+    },
+    {
+      "_index": "ground-truth-ds1",
+      "_id": "fake-tmp-ssh-07",
+      "_score": null,
+      "_source": {
+        "dataset": 1,
+        "challenge_id": "ssh_brute_force",
+        "attack_type": "ssh_brute_force",
+        "attacker_ips": ["198.51.100.77", "203.0.113.55"],
+        "victim_accounts": ["root"],
+        "attack_window": {
+          "start": "2026-05-02T01:00:00Z",
+          "end": "2026-05-02T03:00:00Z"
+        },
+        "indicators": {"fake": true, "note": "second synthetic ssh cluster"},
+        "sources_needed": ["authentication"],
+        "points_max": 40
+      },
+      "sort": ["fake-tmp-ssh-07"]
+    },
+    {
+      "_index": "ground-truth-ds1",
+      "_id": "fake-tmp-sqli-08",
+      "_score": null,
+      "_source": {
+        "dataset": 1,
+        "challenge_id": "sql_injection",
+        "attack_type": "sql_injection",
+        "attacker_ips": ["192.0.2.50"],
+        "victim_accounts": [],
+        "attack_window": {
+          "start": "2026-05-02T06:00:00Z",
+          "end": "2026-05-02T07:30:00Z"
+        },
+        "indicators": {"fake": true, "union_select": true},
+        "sources_needed": ["application", "network"],
+        "points_max": 45
+      },
+      "sort": ["fake-tmp-sqli-08"]
+    },
+    {
+      "_index": "ground-truth-ds1",
+      "_id": "fake-tmp-cred-09",
+      "_score": null,
+      "_source": {
+        "dataset": 1,
+        "challenge_id": "credential_stuffing",
+        "attack_type": "credential_stuffing",
+        "attacker_ips": ["198.51.100.201"],
+        "victim_accounts": ["jdoe"],
+        "attack_window": {
+          "start": "2026-05-02T09:00:00Z",
+          "end": "2026-05-02T10:00:00Z"
+        },
+        "indicators": {"fake": true, "password_spray": true},
+        "sources_needed": ["authentication"],
+        "points_max": 50
+      },
+      "sort": ["fake-tmp-cred-09"]
+    },
+    {
+      "_index": "ground-truth-ds1",
+      "_id": "fake-tmp-ssrf-10",
+      "_score": null,
+      "_source": {
+        "dataset": 1,
+        "challenge_id": "ssrf",
+        "attack_type": "ssrf",
+        "attacker_ips": ["203.0.113.88"],
+        "victim_accounts": [],
+        "attack_window": {
+          "start": "2026-05-02T11:00:00Z",
+          "end": "2026-05-02T12:00:00Z"
+        },
+        "indicators": {"fake": true, "internal_probe": "10.0.3.10:5432"},
+        "sources_needed": ["application"],
+        "points_max": 55
+      },
+      "sort": ["fake-tmp-ssrf-10"]
+    }
+  ],
+  "meta": {
+    "note": "Synthetic alerts for backend / bucket model-attacks-predictions-tmp tests",
+    "source_bucket": "local-fixture",
+    "source_key": "datasets/fake_data/fake-alerts-tmp.json",
+    "event_count": 0,
+    "fake_batch_id": "fake-alerts-tmp-v1"
+  }
+}
