@@ -1,11 +1,10 @@
-"""Package locally trained ``attack_predictor`` artefacts into ``model.tar.gz`` for SageMaker."""
+"""Empaqueter des artefacts sklearn (``model.joblib``, etc.) en ``model.tar.gz`` pour SageMaker."""
 
 from __future__ import annotations
 
 import tarfile
 from pathlib import Path
 
-# Keep in sync with backend.model.attack_predictor.predictor artefact names.
 _REQUIRED = ("model.joblib", "label_encoder.joblib", "metadata.json")
 
 
@@ -14,7 +13,7 @@ def assert_model_dir_ready(model_dir: Path) -> None:
     if missing:
         raise FileNotFoundError(
             f"Model directory {model_dir} missing files: {', '.join(missing)}. "
-            "Train locally with: python -m backend.model.attack_predictor.train ..."
+            f"Expected sklearn artefacts at root: {', '.join(_REQUIRED)}."
         )
 
 

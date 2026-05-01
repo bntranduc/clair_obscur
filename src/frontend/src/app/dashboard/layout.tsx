@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, LayoutDashboard, Bell, FlaskConical, Cpu } from "lucide-react";
+import { Search, LayoutDashboard, Bell, BellRing } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -20,12 +20,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </p>
           <NavLink href="/dashboard" icon={<LayoutDashboard size={18} />} label="Accueil" />
           <NavLink href="/dashboard/logs" icon={<Search size={18} />} label="Logs S3" />
-          <p className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-4">
-            Modèle
-          </p>
           <NavLink href="/dashboard/alerts" icon={<Bell size={18} />} label="Alertes" />
-          <NavLink href="/dashboard/alerts-tmp" icon={<FlaskConical size={18} />} label="Alertes (TMP)" />
-          <NavLink href="/dashboard/call-model" icon={<Cpu size={18} />} label="Appeler le modèle" />
+          <NavLink href="/dashboard/alerts-tmp" icon={<BellRing size={18} />} label="Alertes (TMP)" />
         </nav>
       </aside>
       <main className="flex-1 overflow-auto bg-gradient-to-br from-black to-gray-950 relative">
@@ -35,18 +31,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   );
 }
 
-function navActive(pathname: string, href: string): boolean {
-  if (href === "/dashboard") return pathname === "/dashboard";
-  if (pathname === href) return true;
-  if (!pathname.startsWith(href)) return false;
-  if (href === "/dashboard/alerts" && pathname.startsWith("/dashboard/alerts-tmp")) return false;
-  if (href === "/dashboard/call-model") return pathname === "/dashboard/call-model";
-  return pathname.startsWith(`${href}/`);
-}
-
 function NavLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
   const pathname = usePathname();
-  const active = navActive(pathname, href);
+  const active = pathname === href;
   return (
     <Link
       href={href}
