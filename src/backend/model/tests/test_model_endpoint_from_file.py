@@ -13,8 +13,6 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 _REPO = Path(__file__).resolve().parents[4]
 _DATA = _REPO / "datasets/dataset_test/attacks/opensearch_range_logs_ssh_bruteforce_plus2h.json"
 
@@ -48,6 +46,8 @@ def _post_predict(events: list[Any]) -> str:
 
 
 def test_predict_deployed_from_opensearch_file() -> None:
+    import pytest
+
     if not _DATA.is_file():
         pytest.skip(f"missing dataset: {_DATA}")
     try:
