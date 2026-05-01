@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 """
-Worker SQS → S3 (gzip JSONL) → POST /predict → S3 (résultat JSON).
+Worker SQS → S3 (gzip JSONL) → prédictions → S3 (JSON).
 
-Messages attendus : notifications S3 directes (corps JSON avec ``Records[]``).
+Messages attendus : notifications S3 (corps JSON avec ``Records[]``).
 
 Variables d'environnement :
-  SQS_QUEUE_URL       URL de la file (obligatoire)
-  PREDICT_API_URL     Base API, défaut http://127.0.0.1:8080
-  OUTPUT_BUCKET       Défaut model-attacks-predictions
-  OUTPUT_PREFIX       Défaut predictions/ (doit finir par /)
-  AWS_REGION          Défaut eu-west-3
+  SQS_QUEUE_URL          URL de la file (obligatoire)
+  PREDICT_MODE           ``inline`` = ``predict_alerts`` en process ;
+                         ``http`` (défaut) = POST vers ``PREDICT_API_URL/predict``
+  PREDICT_API_URL        Base API si mode http (défaut http://127.0.0.1:8080)
+  OUTPUT_BUCKET          Défaut model-attacks-predictions
+  OUTPUT_PREFIX          Défaut predictions/
+  AWS_REGION             Défaut eu-west-3
+  AWS_PROFILE            Profil SSO / CLI (optionnel)
+  MAX_SQS_MESSAGES       Messages par ``receive_message`` (1–10), défaut 5
+  BEDROCK_MODEL_ID       Optionnel (inline)
+  BEDROCK_MAX_TOKENS     Optionnel (inline), défaut 4096
 """
 from __future__ import annotations
 
@@ -65,7 +71,6 @@ def _parse_s3_records(body: str) -> list[tuple[str, str]]:
         envelope = json.loads(body)
     except json.JSONDecodeError:
         return []
-    # Enveloppe SNS → SQS (si jamais utilisé)
     if isinstance(envelope, dict) and "Message" in envelope and "TopicArn" in envelope:
         try:
             envelope = json.loads(envelope["Message"])
@@ -103,6 +108,52 @@ def _post_predict(base: str, events: list[dict[str, Any]], *, timeout: int) -> d
         return json.loads(resp.read().decode("utf-8"))
 
 
+def _predict_inline(
+    events: list[dict[str, Any]],
+    *,
+    region: str,
+    model_id: str | None,
+    max_tokens: int,
+    profile_name: str | None,
+) -> dict[str, Any]:
+    from backend.model.predict import predict_alerts
+
+    mid = (model_id or "").strip() or None
+    alerts = predict_alerts(
+        events,
+        region=region,
+        model_id=mid,
+        max_tokens=max_tokens,
+        profile_name=profile_name,
+    )
+    return {"alerts": alerts}
+
+
+def _run_predict(
+    events: list[dict[str, Any]],
+    *,
+    mode: str,
+    predict_base: str,
+    predict_timeout: int,
+    region: str,
+    model_id: str | None,
+    max_tokens: int,
+    profile_name: str | None,
+) -> dict[str, Any]:
+    m = (mode or "http").strip().lower()
+    if m == "http":
+        return _post_predict(predict_base, events, timeout=predict_timeout)
+    if m == "inline":
+        return _predict_inline(
+            events,
+            region=region,
+            model_id=model_id,
+            max_tokens=max_tokens,
+            profile_name=profile_name,
+        )
+    raise ValueError(f"unknown PREDICT_MODE={mode!r} (use inline or http)")
+
+
 def _output_key(source_bucket: str, source_key: str) -> str:
     prefix = os.getenv("OUTPUT_PREFIX", "predictions/").strip() or "predictions/"
     if not prefix.endswith("/"):
@@ -120,9 +171,14 @@ def process_one_message(
     queue_url: str,
     msg: dict[str, Any],
     *,
+    predict_mode: str,
     predict_base: str,
     out_bucket: str,
     predict_timeout: int,
+    region: str,
+    model_id: str | None,
+    max_tokens: int,
+    profile_name: str | None,
 ) -> None:
     body = msg.get("Body") or ""
     if not isinstance(body, str):
@@ -142,7 +198,16 @@ def process_one_message(
         if not events:
             result: dict[str, Any] = {"alerts": [], "meta": {**meta, "note": "no_events_parsed"}}
         else:
-            result = _post_predict(predict_base, events, timeout=predict_timeout)
+            result = _run_predict(
+                events,
+                mode=predict_mode,
+                predict_base=predict_base,
+                predict_timeout=predict_timeout,
+                region=region,
+                model_id=model_id,
+                max_tokens=max_tokens,
+                profile_name=profile_name,
+            )
             if isinstance(result, dict):
                 result = {**result, "meta": meta}
 
@@ -164,24 +229,33 @@ def main() -> int:
         return 1
 
     region = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "eu-west-3"))
+    predict_mode = os.getenv("PREDICT_MODE", "http").strip()
     predict_base = os.getenv("PREDICT_API_URL", "http://127.0.0.1:8080").rstrip("/")
     out_bucket = os.getenv("OUTPUT_BUCKET", "model-attacks-predictions").strip()
     predict_timeout = int(os.getenv("PREDICT_TIMEOUT_SEC", "900"))
     wait_sec = int(os.getenv("SQS_WAIT_TIME_SECONDS", "20"))
     vis_timeout = int(os.getenv("SQS_VISIBILITY_TIMEOUT", "900"))
+    max_msgs = min(10, max(1, int(os.getenv("MAX_SQS_MESSAGES", "5"))))
+    prof = (os.getenv("AWS_PROFILE") or "").strip() or None
+    mid_env = (os.getenv("BEDROCK_MODEL_ID") or "").strip() or None
+    max_tok = int(os.getenv("BEDROCK_MAX_TOKENS", "4096"))
 
-    session = boto3.session.Session(region_name=region)
+    session_kw: dict[str, Any] = {"region_name": region}
+    if prof:
+        session_kw["profile_name"] = prof
+    session = boto3.session.Session(**session_kw)
     sqs = session.client("sqs")
     s3 = session.client("s3")
 
     print(
-        f"worker start queue={queue_url!r} predict={predict_base} out={out_bucket}",
+        f"worker start queue={queue_url!r} mode={predict_mode!r} "
+        f"out={out_bucket} region={region}",
         flush=True,
     )
     while True:
         resp = sqs.receive_message(
             QueueUrl=queue_url,
-            MaxNumberOfMessages=1,
+            MaxNumberOfMessages=max_msgs,
             WaitTimeSeconds=min(20, max(0, wait_sec)),
             VisibilityTimeout=min(43200, max(0, vis_timeout)),
             AttributeNames=["All"],
@@ -196,9 +270,14 @@ def main() -> int:
                     s3,
                     queue_url,
                     msg,
+                    predict_mode=predict_mode,
                     predict_base=predict_base,
                     out_bucket=out_bucket,
                     predict_timeout=predict_timeout,
+                    region=region,
+                    model_id=mid_env,
+                    max_tokens=max_tok,
+                    profile_name=prof,
                 )
             except urllib.error.HTTPError as e:
                 print(e.read().decode("utf-8", errors="replace"), file=sys.stderr)

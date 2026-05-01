@@ -1,5 +1,10 @@
-# Racine du repo : docker compose -f docker-compose.model.yml up --build
-# Bedrock : AWS_PROFILE + volume ~/.aws (après aws sso login sur l’hôte). Voir model/README.md.
+# Racine du repo :
+#   API seule : docker compose -f docker-compose.model.yml up --build
+#   API + worker SQS : définir SQS_QUEUE_URL (.env ou env), puis :
+#     docker compose -f docker-compose.model.yml --profile sqs up --build
+#
+# Worker : poll SQS (messages S3), télécharge le JSONL.gz, predict_alerts (inline),
+# écrit dans OUTPUT_BUCKET (défaut model-attacks-predictions/predictions/).
 services:
   model:
     build:
@@ -14,5 +19,41 @@ services:
       AWS_REGION: ${AWS_REGION:-eu-west-3}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-west-3}
       AWS_PROFILE: ${AWS_PROFILE:-}
+    volumes:
+      - ~/.aws:/root/.aws:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  worker:
+    profiles:
+      - sqs
+    build:
+      context: .
+      dockerfile: src/backend/model/Dockerfile
+    command: ["python3", "/app/src/backend/scripts/sqs_predict_worker.py"]
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      AWS_REGION: ${AWS_REGION:-eu-west-3}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-west-3}
+      AWS_PROFILE: ${AWS_PROFILE:-}
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
+      PREDICT_MODE: ${PREDICT_MODE:-inline}
+      OUTPUT_BUCKET: ${OUTPUT_BUCKET:-model-attacks-predictions}
+      OUTPUT_PREFIX: ${OUTPUT_PREFIX:-predictions/}
+      PREDICT_API_URL: ${PREDICT_API_URL:-http://model:8080}
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-}
+      BEDROCK_MAX_TOKENS: ${BEDROCK_MAX_TOKENS:-4096}
+      MAX_SQS_MESSAGES: ${MAX_SQS_MESSAGES:-5}
     volumes:
       - ~/.aws:/root/.aws:ro

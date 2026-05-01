@@ -109,14 +109,22 @@ export AWS_PROFILE=bao   # ton profil SSO
 ./src/backend/scripts/run_model_docker.sh
 ```
 
-Arrière-plan : `./src/backend/scripts/run_model_docker.sh -d`  
-Arrêt : `docker compose -f docker-compose.model.yml down` (depuis la racine du repo).
+API **+ worker SQS** (prédictions écrites dans `s3://model-attacks-predictions/predictions/` par défaut) : renseigne **`SQS_QUEUE_URL`** dans `.env`, puis :
 
-Sans le script (Compose V2 ou V1) :
+```bash
+./src/backend/scripts/run_model_docker.sh --profile sqs
+```
+
+Le worker tourne en boucle (**long polling** SQS, équivalent pratique à une tâche planifiée). Mode **`PREDICT_MODE=inline`** par défaut dans Compose : appelle **`predict_alerts`** sans passer par HTTP. Pour déléguer à l’API du même compose : `PREDICT_MODE=http` et `PREDICT_API_URL=http://model:8080`.
+
+Arrêt : `docker compose -f docker-compose.model.yml down`.  
+Arrière-plan : ajoute `-d` à la fin de la commande `docker compose`.
+
+Sans le script :
 
 ```bash
 docker compose -f docker-compose.model.yml up --build
-# ou : docker-compose -f docker-compose.model.yml up --build
+docker compose -f docker-compose.model.yml --profile sqs up --build
 ```
 
 Si la sous-commande `compose` n’existe pas sur ton EC2, installe le plugin Docker Compose ou utilise uniquement `docker build` / `docker run` (voir message d’erreur du script).
@@ -149,6 +157,7 @@ docker run --rm -p 8080:8080 -e AWS_REGION=eu-west-3 -e AWS_PROFILE=bao \
 | `../../docker-compose.model.yml` | Compose : build + port 8080 + `.env` |
 | `../../.dockerignore` | Contexte de build allégé |
 | `../scripts/run_model_serve.sh` | Lance uvicorn avec `PYTHONPATH` correct |
-| `../scripts/run_model_docker.sh` | Build + `docker compose` pour l’API |
+| `../scripts/run_model_docker.sh` | Build + Compose (`--profile sqs` pour le worker) |
+| `../scripts/sqs_predict_worker.py` | Worker SQS → S3 logs → prédictions → S3 JSON |
 
 Le modèle `.env` versionné est à la racine du repo : `.env.example`.
