@@ -102,15 +102,24 @@ Documentation interactive : `http://VOTRE_IP_PUBLIQUE:8080/docs`
 
 ### 6. Docker (minimal)
 
-À la racine du dépôt. Pour Bedrock : `cp .env.example .env` puis édite les variables AWS — le fichier est **optionnel** au démarrage du conteneur (sans `.env`, seuls `/health` et la région auront un sens tant que tu n’appelles pas `/predict`).
+À la racine du dépôt. Le conteneur utilise **`AWS_PROFILE`** + le dossier **`~/.aws`** monté en lecture seule (après `aws sso login` sur la machine hôte). Optionnel : `.env` avec `AWS_PROFILE`, `BEDROCK_*` (voir `.env.example`).
+
+```bash
+export AWS_PROFILE=bao   # ton profil SSO
+./src/backend/scripts/run_model_docker.sh
+```
+
+Arrière-plan : `./src/backend/scripts/run_model_docker.sh -d`  
+Arrêt : `docker compose -f docker-compose.model.yml down` (depuis la racine du repo).
+
+Sans le script (Compose V2 ou V1) :
 
 ```bash
 docker compose -f docker-compose.model.yml up --build
+# ou : docker-compose -f docker-compose.model.yml up --build
 ```
 
-`-d` pour tourner en arrière-plan : `docker compose -f docker-compose.model.yml up --build -d`.
-
-Arrêt : `docker compose -f docker-compose.model.yml down`.
+Si la sous-commande `compose` n’existe pas sur ton EC2, installe le plugin Docker Compose ou utilise uniquement `docker build` / `docker run` (voir message d’erreur du script).
 
 **Credentials :** avec Compose, **`~/.aws` est monté en lecture seule** et **`AWS_PROFILE`** est repris de l’hôte (profil SSO). Sur une EC2 qui ne s’authentifie **que** par rôle IAM (sans `~/.aws`), adapte ou retire le volume dans `docker-compose.model.yml`.
 
@@ -134,11 +143,12 @@ docker run --rm -p 8080:8080 -e AWS_REGION=eu-west-3 -e AWS_PROFILE=bao \
 | Fichier | Rôle |
 |--------|------|
 | `serve_app.py` | FastAPI `/health`, `/predict` |
-| `predict.py` | `predict_alerts(events, …)` (lib + creds optionnels) |
+| `predict.py` | `predict_alerts(events, …)` (profil AWS / chaîne boto3) |
 | `requirements-api.txt` | Dépendances pour l’API |
 | `Dockerfile` | Image avec uvicorn |
 | `../../docker-compose.model.yml` | Compose : build + port 8080 + `.env` |
 | `../../.dockerignore` | Contexte de build allégé |
 | `../scripts/run_model_serve.sh` | Lance uvicorn avec `PYTHONPATH` correct |
+| `../scripts/run_model_docker.sh` | Build + `docker compose` pour l’API |
 
 Le modèle `.env` versionné est à la racine du repo : `.env.example`.
