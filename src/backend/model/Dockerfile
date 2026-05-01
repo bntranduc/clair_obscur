@@ -6,7 +6,7 @@
 #     -e AWS_SECRET_ACCESS_KEY=... \
 #     -e AWS_SESSION_TOKEN=... \
 #     -e AWS_REGION=eu-west-3 \
-#     -e BEDROCK_MODEL_ID=eu.anthropic.claude-sonnet-4-6 \
+#     -e BEDROCK_MODEL_ID=eu.anthropic.claude-opus-4-6-v1 \
 #     clair-model
 #
 # Alternative : monter le profil local (pas de variables pour les clés) :

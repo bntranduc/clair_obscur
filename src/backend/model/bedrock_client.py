@@ -5,7 +5,7 @@ from typing import Optional
 import boto3
 from botocore.config import Config
 
-MODEL_ID_DEFAULT = "eu.anthropic.claude-opus-4-7"
+MODEL_ID_DEFAULT = "eu.anthropic.claude-opus-4-6-v1"
 
 
 def bedrock_converse_text(

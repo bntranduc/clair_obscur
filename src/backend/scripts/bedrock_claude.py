@@ -11,10 +11,8 @@ from botocore.config import Config
 # Student guide model id (often NOT callable on-demand on some accounts).
 GUIDE_MODEL_ID = "anthropic.claude-opus-4-6-v1"
 #
-# If on-demand throughput isn't supported, Bedrock requires an *inference profile* ID/ARN.
-# This repo previously used a profile-like id in eu-west-3. Keep it as the default so the
-# script works out of the box for those accounts.
-MODEL_ID_DEFAULT = "eu.anthropic.claude-opus-4-7"
+# EU inference profile (eu-west-3) — même défaut que l’API modèle (`bedrock_client.MODEL_ID_DEFAULT`).
+MODEL_ID_DEFAULT = "eu.anthropic.claude-opus-4-6-v1"
 
 
 def call_bedrock_claude_opus_4_6(
