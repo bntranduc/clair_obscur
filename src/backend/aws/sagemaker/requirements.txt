@@ -1,5 +1,0 @@
-# Runtime helpers (upload): boto3 is usually already installed with AWS tooling.
-boto3>=1.28,<2
-
-# Optional: SageMaker Python SDK for deploy_sklearn_endpoint / cli deploy
-sagemaker>=2.190,<3

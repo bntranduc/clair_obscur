@@ -3,26 +3,24 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import {
-  fetchPredictionS3Objects,
-  fetchPredictionsFile,
-  type PredictionsApiPrefix,
+  fetchPredictionFile,
+  fetchPredictionObjects,
+  type AlertsPool,
   type S3ObjectInfo,
 } from "@/lib/api";
 
-const ALERT_FIELDS_FALLBACK = [
+const ALERT_COLUMNS = [
   "_id",
-  "_index",
-  "dataset",
   "challenge_id",
   "attack_type",
   "attacker_ips",
   "victim_accounts",
-  "attack_window_start",
-  "attack_window_end",
-  "indicators",
-  "sources_needed",
+  "window_start",
+  "window_end",
   "points_max",
-];
+  "sources_needed",
+  "indicators",
+] as const;
 
 function cellDisplay(v: unknown): string {
   if (v === null || v === undefined) return "—";
@@ -30,20 +28,39 @@ function cellDisplay(v: unknown): string {
   return String(v);
 }
 
+function flattenAlertHit(hit: unknown): Record<string, unknown> {
+  if (!hit || typeof hit !== "object") {
+    return { _id: "—" };
+  }
+  const h = hit as Record<string, unknown>;
+  const src = (h._source as Record<string, unknown>) || {};
+  const win = (src.attack_window as Record<string, unknown>) || {};
+  return {
+    _id: h._id,
+    challenge_id: src.challenge_id,
+    attack_type: src.attack_type,
+    attacker_ips: src.attacker_ips,
+    victim_accounts: src.victim_accounts,
+    window_start: win.start,
+    window_end: win.end,
+    points_max: src.points_max,
+    sources_needed: src.sources_needed,
+    indicators: src.indicators,
+  };
+}
+
 type Props = {
-  apiPrefix: PredictionsApiPrefix;
+  pool: AlertsPool;
   title: string;
   bucketLabel: string;
 };
 
-export function PredictionsAlertsPage({ apiPrefix, title, bucketLabel }: Props) {
+export function AlertsPoolView({ pool, title, bucketLabel }: Props) {
   const [objects, setObjects] = useState<S3ObjectInfo[]>([]);
   const [bucketInfo, setBucketInfo] = useState<{ bucket: string; prefix: string } | null>(null);
   const [selectedKey, setSelectedKey] = useState("");
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
-  const [fieldOrder, setFieldOrder] = useState<string[]>(() => [...ALERT_FIELDS_FALLBACK]);
   const [meta, setMeta] = useState<Record<string, unknown> | null>(null);
-  const [alertCount, setAlertCount] = useState<number | null>(null);
   const [loadingList, setLoadingList] = useState(true);
   const [loadingFile, setLoadingFile] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +71,7 @@ export function PredictionsAlertsPage({ apiPrefix, title, bucketLabel }: Props) 
       try {
         setLoadingList(true);
         setError(null);
-        const data = await fetchPredictionS3Objects(apiPrefix, 200);
+        const data = await fetchPredictionObjects(pool, 200);
         if (cancelled) return;
         setBucketInfo({ bucket: data.bucket, prefix: data.prefix });
         setObjects(data.objects);
@@ -70,7 +87,7 @@ export function PredictionsAlertsPage({ apiPrefix, title, bucketLabel }: Props) 
     return () => {
       cancelled = true;
     };
-  }, [apiPrefix]);
+  }, [pool]);
 
   const loadFile = useCallback(
     async (key: string) => {
@@ -78,28 +95,25 @@ export function PredictionsAlertsPage({ apiPrefix, title, bucketLabel }: Props) 
       try {
         setLoadingFile(true);
         setError(null);
-        const data = await fetchPredictionsFile(apiPrefix, key);
-        setRows(data.rows);
-        setFieldOrder(data.field_order?.length ? data.field_order : [...ALERT_FIELDS_FALLBACK]);
-        setMeta(data.meta ?? null);
-        setAlertCount(data.alert_count);
+        const data = await fetchPredictionFile(pool, key);
+        setRows(data.alerts.map(flattenAlertHit));
+        setMeta(data.meta);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         setRows([]);
         setMeta(null);
-        setAlertCount(null);
       } finally {
         setLoadingFile(false);
       }
     },
-    [apiPrefix]
+    [pool]
   );
 
   useEffect(() => {
     if (selectedKey) void loadFile(selectedKey);
   }, [selectedKey, loadFile]);
 
-  const colCount = fieldOrder.length || ALERT_FIELDS_FALLBACK.length;
+  const colCount = ALERT_COLUMNS.length;
 
   return (
     <div className="p-8 space-y-6">
@@ -108,16 +122,16 @@ export function PredictionsAlertsPage({ apiPrefix, title, bucketLabel }: Props) 
         <p className="text-gray-400 text-sm">
           Fichiers JSON de prédictions sous{" "}
           <code className="text-indigo-300">
-            {bucketInfo ? `${bucketInfo.bucket}/${bucketInfo.prefix}` : bucketLabel}
-          </code>{" "}
-          — tableau des alertes renvoyées par le modèle (format DS1 /{" "}
-          <code className="text-indigo-300">PredictResponse.alerts</code>).
+            {bucketLabel} — {bucketInfo ? `${bucketInfo.bucket}/${bucketInfo.prefix}` : "…"}
+          </code>
+          . Chaque fichier contient un tableau <code className="text-indigo-300">alerts</code> (format type
+          ground truth DS1).
         </p>
       </header>
 
       <div className="flex flex-wrap gap-4 items-end bg-white/5 p-4 rounded-xl border border-white/10">
         <div className="flex flex-col gap-1 min-w-[280px] flex-1">
-          <label className="text-xs text-gray-500 uppercase tracking-wider">Objet S3</label>
+          <label className="text-xs text-gray-500 uppercase tracking-wider">Fichier S3</label>
           <select
             value={selectedKey}
             onChange={(e) => setSelectedKey(e.target.value)}
@@ -129,7 +143,7 @@ export function PredictionsAlertsPage({ apiPrefix, title, bucketLabel }: Props) 
             ) : (
               objects.map((o) => (
                 <option key={o.key} value={o.key}>
-                  {o.key.split("/").slice(-1)[0]} ({Math.round(o.size / 1024)} Ko)
+                  {o.key.split("/").slice(-2).join("/")} ({Math.round(o.size / 1024)} Ko)
                 </option>
               ))
             )}
@@ -142,7 +156,7 @@ export function PredictionsAlertsPage({ apiPrefix, title, bucketLabel }: Props) 
           className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/10 rounded-lg text-sm hover:bg-white/15 disabled:opacity-40"
         >
           <RefreshCw size={16} className={loadingFile ? "animate-spin" : ""} />
-          Recharger le fichier
+          Recharger
         </button>
       </div>
 
@@ -151,12 +165,9 @@ export function PredictionsAlertsPage({ apiPrefix, title, bucketLabel }: Props) 
       )}
 
       {meta && Object.keys(meta).length > 0 && (
-        <details className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-gray-400">
-          <summary className="cursor-pointer text-gray-300 font-medium">Métadonnées fichier (meta)</summary>
-          <pre className="mt-3 text-xs font-mono text-indigo-200/90 whitespace-pre-wrap overflow-x-auto">
-            {JSON.stringify(meta, null, 2)}
-          </pre>
-        </details>
+        <div className="text-xs text-gray-500 font-mono bg-black/30 border border-white/5 rounded-lg p-3 overflow-x-auto">
+          <span className="text-gray-400">meta</span> {cellDisplay(meta)}
+        </div>
       )}
 
       <div className="glass-panel border border-white/10 rounded-xl overflow-hidden">
@@ -166,13 +177,10 @@ export function PredictionsAlertsPage({ apiPrefix, title, bucketLabel }: Props) 
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <div className="px-4 py-2 text-xs text-gray-500 border-b border-white/10">
-              {alertCount !== null ? `${alertCount} alerte${alertCount === 1 ? "" : "s"}` : ""}
-            </div>
             <table className="w-full text-left border-collapse text-sm min-w-max">
               <thead>
                 <tr className="border-b border-white/10 text-gray-400 text-xs uppercase tracking-wider bg-black/20">
-                  {fieldOrder.map((key) => (
+                  {ALERT_COLUMNS.map((key) => (
                     <th key={key} className="p-3 font-medium whitespace-nowrap">
                       {key.replace(/_/g, " ")}
                     </th>
@@ -182,7 +190,7 @@ export function PredictionsAlertsPage({ apiPrefix, title, bucketLabel }: Props) 
               <tbody className="divide-y divide-white/5">
                 {rows.map((row, i) => (
                   <tr key={`${cellDisplay(row._id)}-${i}`} className="hover:bg-white/5">
-                    {fieldOrder.map((key) => (
+                    {ALERT_COLUMNS.map((key) => (
                       <td
                         key={key}
                         className="p-3 font-mono text-xs text-gray-300 max-w-[16rem] truncate align-top"
@@ -196,7 +204,7 @@ export function PredictionsAlertsPage({ apiPrefix, title, bucketLabel }: Props) 
                 {rows.length === 0 && !loadingFile && (
                   <tr>
                     <td colSpan={colCount} className="p-12 text-center text-gray-500">
-                      Aucune alerte dans ce fichier (ou fichier vide / liste d&apos;objets vide).
+                      Aucune alerte dans ce fichier (ou fichier vide / non listé).
                     </td>
                   </tr>
                 )}

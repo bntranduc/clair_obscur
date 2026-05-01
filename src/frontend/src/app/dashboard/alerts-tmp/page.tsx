@@ -1,11 +1,5 @@
-import { PredictionsAlertsPage } from "@/components/dashboard/PredictionsAlertsPage";
+import { AlertsPoolView } from "../components/AlertsPoolView";
 
 export default function AlertsTmpPage() {
-  return (
-    <PredictionsAlertsPage
-      apiPrefix="/api/v1/alerts-tmp"
-      title="Alertes (TMP)"
-      bucketLabel="model-attacks-predictions-tmp"
-    />
-  );
+  return <AlertsPoolView pool="tmp" title="Alertes (TMP)" bucketLabel="bucket temporaire" />;
 }

@@ -2,19 +2,14 @@
 keys/
 *.pem
 *.ppk
-*.p12
 .env
 .env.*
 !.env.example
-!**/.env.example
+# direnv / exports locaux souvent avec AWS_* ou tokens
 .envrc
 .direnv/
+# copie accidentelle de ~/.aws à la racine du repo
 .aws/
-credentials.json
-**/credentials.json
-*-credentials*.json
-*-secrets*.yaml
-*-secrets*.yml
 
 # Compose / overrides locaux avec secrets
 docker-compose.override.yml
@@ -32,20 +27,13 @@ venv/
 dist/
 build/
 pip-wheel-metadata/
-*.egg
-develop-eggs/
-*.manifest
-*.spec
 
 # --- Tests / linters ---
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
-.coverage.*
-coverage.xml
 htmlcov/
-.hypothesis/
 
 # --- Jupyter ---
 .ipynb_checkpoints/
@@ -55,16 +43,9 @@ htmlcov/
 model.tar.gz
 **/model.tar.gz
 
-# --- AWS CDK / SAM (si utilisés) ---
-cdk.out/
-.cdk.staging/
-
-# --- Node / Next.js (tout le monorepo) ---
-**/node_modules/
-**/.next/
-**/out/
-.vercel
-*.tsbuildinfo
+# --- Exécution locale (serveur / scripts en arrière-plan) ---
+nohup.out
+*.pid
 
 # --- IDE / OS ---
 .idea/
@@ -73,18 +54,13 @@ cdk.out/
 *~
 .DS_Store
 Thumbs.db
-Desktop.ini
 
 # --- Logs & tmp projet ---
 *.log
 /tmp/
 
-# --- Données / bundles volontairement exclus du dépôt ---
 datasets/**
 !datasets/fake_data/
 !datasets/fake_data/**
-
-# Modèles entraînés / checkpoints locaux (voir aussi predictors/.gitignore)
-src/backend/model/attack_predictor/predictors/
 
 archives/

@@ -1,11 +1,5 @@
-import { PredictionsAlertsPage } from "@/components/dashboard/PredictionsAlertsPage";
+import { AlertsPoolView } from "../components/AlertsPoolView";
 
 export default function AlertsPage() {
-  return (
-    <PredictionsAlertsPage
-      apiPrefix="/api/v1/alerts"
-      title="Alertes"
-      bucketLabel="model-attacks-predictions"
-    />
-  );
+  return <AlertsPoolView pool="prod" title="Alertes" bucketLabel="bucket production" />;
 }

@@ -1,111 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-/** Si ``1`` : appels navigateur vers ``/api/dashboard-proxy/...`` (serveur → EC2 HTTP, pas de mixed content). */
-function useDashboardProxy(): boolean {
-  return process.env.NEXT_PUBLIC_DASHBOARD_API_PROXY === "1";
-}
+/** Appel direct à uvicorn (SSR / scripts) ; le navigateur utilise le proxy par défaut (voir ``next.config``). */
+const DEFAULT_API_DIRECT = "http://127.0.0.1:8010";
 
-/**
- * Base pour les URLs d’API : pas de fallback localhost — uniquement variables d’environnement
- * (URL publique EC2 ou proxy Amplify).
- */
+/** Préfixe servi par Next (rewrite → dashboard) : même origine que la page → évite « Failed to fetch » si tu ouvres le site via ``localhost`` ou une IP LAN au lieu de ``127.0.0.1``. */
+const BFF_PREFIX = "/bff-dashboard";
+
 function apiBase(): string {
-  if (useDashboardProxy()) {
-    return "/api/dashboard-proxy";
-  }
-  const raw = process.env.NEXT_PUBLIC_DASHBOARD_API_URL?.trim();
-  if (!raw) {
-    throw new Error(
-      "NEXT_PUBLIC_DASHBOARD_API_URL est obligatoire (URL publique du dashboard API, ex. http://ec2-….amazonaws.com:8010). " +
-        "Sur Amplify en HTTPS : NEXT_PUBLIC_DASHBOARD_API_PROXY=1 et DASHBOARD_API_URL côté serveur. Voir src/frontend/.env.example."
-    );
-  }
-  return raw.replace(/\/+$/, "");
-}
-
-/** Navigateur HTTPS → API HTTP : blocage mixed-content avant tout réseau (« Failed to fetch »). */
-function throwIfMixedContentWouldBlock(url: string): void {
-  if (typeof window === "undefined") return;
-  if (window.location.protocol !== "https:") return;
-  if (useDashboardProxy()) return;
-  const base = apiBase();
-  if (base.startsWith("http://") || url.startsWith("http://")) {
-    throw new Error(
-      "Mixed content : la page est en HTTPS mais l’API dashboard est en HTTP ; le navigateur bloque l’appel (Failed to fetch). " +
-        "Solution : définir NEXT_PUBLIC_DASHBOARD_API_PROXY=1 et DASHBOARD_API_URL (URL EC2:8010) côté serveur Next.js / Amplify. " +
-        "Voir src/frontend/.env.example."
-    );
-  }
-}
-
-/** Évite le vague « Failed to fetch » avec un message exploitable. */
-async function dashboardFetch(url: string): Promise<Response> {
-  throwIfMixedContentWouldBlock(url);
-  try {
-    return await fetch(url, { cache: "no-store" });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (useDashboardProxy()) {
-      throw new Error(
-        `Proxy dashboard injoignable. Définis DASHBOARD_API_URL (http://EC2:8010) côté serveur Amplify / runtime. ` +
-          `Détails : ${msg}`
-      );
-    }
-    const hint =
-      typeof window !== "undefined" && window.location.protocol === "https:"
-        ? " Si tu es sur un site HTTPS (ex. Amplify), utilise le proxy (NEXT_PUBLIC_DASHBOARD_API_PROXY=1)."
-        : "";
-    throw new Error(
-      `API injoignable (${apiBase()}). Vérifie EC2, security group :8010, CORS.${hint} Détails : ${msg}`
-    );
-  }
-}
-
-async function dashboardFetchPost(url: string, jsonBody: unknown): Promise<Response> {
-  throwIfMixedContentWouldBlock(url);
-  try {
-    return await fetch(url, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(jsonBody),
-      cache: "no-store",
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (useDashboardProxy()) {
-      throw new Error(
-        `Proxy dashboard injoignable. Définis DASHBOARD_API_URL (http://EC2:8010) côté serveur Amplify / runtime. ` +
-          `Détails : ${msg}`
-      );
-    }
-    const hint =
-      typeof window !== "undefined" && window.location.protocol === "https:"
-        ? " Si tu es sur un site HTTPS (ex. Amplify), utilise NEXT_PUBLIC_DASHBOARD_API_PROXY=1."
-        : "";
-    throw new Error(
-      `API injoignable (${apiBase()}). Vérifie EC2, security group :8010, CORS.${hint} Détails : ${msg}`
-    );
-  }
-}
-
-/** Appelle ``POST /api/v1/model/predict`` (proxy dashboard → service modèle). */
-export async function callModelPredict(
-  events: Record<string, unknown>[]
-): Promise<Record<string, unknown>> {
-  const url = `${apiBase()}/api/v1/model/predict`;
-  const res = await dashboardFetchPost(url, { events });
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`predict failed ${res.status}: ${text}`);
-  }
-  try {
-    return JSON.parse(text) as Record<string, unknown>;
-  } catch {
-    throw new Error(`predict: réponse non-JSON: ${text.slice(0, 500)}`);
-  }
+  const fromEnv = process.env.NEXT_PUBLIC_DASHBOARD_API_URL?.trim();
+  if (fromEnv) return fromEnv.replace(/\/+$/, "");
+  if (typeof window !== "undefined") return BFF_PREFIX;
+  return DEFAULT_API_DIRECT;
 }
 
 export type S3ObjectInfo = {
@@ -172,7 +77,7 @@ export type S3SampleResponse = {
 
 export async function fetchS3LogObjects(maxKeys = 100): Promise<ListS3ObjectsResponse> {
   const url = `${apiBase()}/api/v1/logs/s3-objects?max_keys=${maxKeys}`;
-  const res = await dashboardFetch(url);
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`list objects failed ${res.status}: ${await res.text()}`);
   return res.json();
 }
@@ -186,41 +91,48 @@ export async function fetchS3LogSample(
   if (opts?.offsetLines != null) sp.set("offset_lines", String(opts.offsetLines));
   if (opts?.limitLines != null) sp.set("limit_lines", String(opts.limitLines));
   const url = `${apiBase()}/api/v1/logs/s3-sample?${sp}`;
-  const res = await dashboardFetch(url);
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`sample failed ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
-/** Préfixe API : ``/api/v1/alerts`` (prod) ou ``/api/v1/alerts-tmp``. */
-export type PredictionsApiPrefix = "/api/v1/alerts" | "/api/v1/alerts-tmp";
+export type AlertsPool = "prod" | "tmp";
 
-export type PredictionsFileResponse = {
+export type ListPredictionsResponse = {
+  pool: string;
   bucket: string;
-  key: string;
-  meta?: Record<string, unknown> | null;
-  alert_count: number;
-  rows: Record<string, unknown>[];
-  field_order: string[];
+  prefix: string;
+  objects: S3ObjectInfo[];
+  continuation_token?: string | null;
 };
 
-export async function fetchPredictionS3Objects(
-  apiPrefix: PredictionsApiPrefix,
+export type PredictionFileResponse = {
+  pool: string;
+  bucket: string;
+  key: string;
+  alerts: Record<string, any>[];
+  meta: Record<string, any> | null;
+};
+
+export async function fetchPredictionObjects(
+  pool: AlertsPool,
   maxKeys = 200
-): Promise<ListS3ObjectsResponse> {
-  const url = `${apiBase()}${apiPrefix}/s3-objects?max_keys=${maxKeys}`;
-  const res = await dashboardFetch(url);
-  if (!res.ok) throw new Error(`list predictions objects failed ${res.status}: ${await res.text()}`);
+): Promise<ListPredictionsResponse> {
+  const sp = new URLSearchParams();
+  sp.set("pool", pool);
+  sp.set("max_keys", String(maxKeys));
+  const url = `${apiBase()}/api/v1/alerts/s3-objects?${sp}`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`list predictions failed ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
-export async function fetchPredictionsFile(
-  apiPrefix: PredictionsApiPrefix,
-  key: string
-): Promise<PredictionsFileResponse> {
+export async function fetchPredictionFile(pool: AlertsPool, key: string): Promise<PredictionFileResponse> {
   const sp = new URLSearchParams();
+  sp.set("pool", pool);
   sp.set("key", key);
-  const url = `${apiBase()}${apiPrefix}/s3-predictions?${sp}`;
-  const res = await dashboardFetch(url);
-  if (!res.ok) throw new Error(`predictions file failed ${res.status}: ${await res.text()}`);
+  const url = `${apiBase()}/api/v1/alerts/prediction?${sp}`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`prediction file failed ${res.status}: ${await res.text()}`);
   return res.json();
 }
