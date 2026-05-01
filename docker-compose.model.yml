@@ -1,0 +1,15 @@
+# Racine du repo : docker compose -f docker-compose.model.yml up --build
+# Pour Bedrock : cp .env.example .env puis creds AWS (le fichier est optionnel au démarrage).
+services:
+  model:
+    build:
+      context: .
+      dockerfile: src/backend/model/Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      AWS_REGION: ${AWS_REGION:-eu-west-3}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-west-3}

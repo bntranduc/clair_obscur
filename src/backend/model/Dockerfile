@@ -1,12 +1,8 @@
-# Build from repo root: docker build -f src/backend/model/Dockerfile -t clair-model .
+# Build depuis la racine du repo :
+#   docker build -f src/backend/model/Dockerfile -t clair-model .
+# Ou : docker compose -f docker-compose.model.yml up --build
 #
-# En local (racine du repo) : export PYTHONPATH="$(pwd)/src" puis uvicorn …
-#   ou : ./src/backend/scripts/run_model_serve.sh
-#
-#   docker run --rm -p 8080:8080 -e PYTHONPATH=/app/src \
-#     -e AWS_REGION=eu-west-3 -v ~/.aws:/root/.aws:ro clair-model
-#
-# Ou rôle IAM sur EC2 / variables AWS pour Bedrock.
+# Credentials Bedrock : passer --env-file .env au run / Compose (voir model/README.md).
 FROM python:3.11-slim
 
 WORKDIR /app
