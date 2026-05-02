@@ -1,4 +1,4 @@
-"""Prédictions modèle (alertes JSON) dans S3 — buckets prod et tmp."""
+"""Prédictions modèle (alertes JSON) dans S3."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from urllib.parse import unquote
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.api import config
-from backend.api.deps import s3_client
+from api import config
+from api.deps import s3_client
 
 router = APIRouter(tags=["alerts"])
 
@@ -36,7 +36,7 @@ def _require_prediction_key(key: str) -> str:
 
 @router.get("/s3-objects")
 def list_prediction_objects(
-    pool: Pool = Query("prod", description="prod = prédictions stables, tmp = bucket temporaire"),
+    pool: Pool = Query("prod", description="prod ou bucket tmp"),
     max_keys: int = Query(100, ge=1, le=500),
     continuation_token: str | None = None,
 ) -> dict[str, Any]:
@@ -74,9 +74,8 @@ def list_prediction_objects(
 @router.get("/prediction")
 def get_prediction_file(
     pool: Pool = Query("prod"),
-    key: str = Query(..., description="Clé S3 du fichier JSON de prédictions"),
+    key: str = Query(..., description="Clé S3 du fichier JSON"),
 ) -> dict[str, Any]:
-    """Retourne le JSON S3 (champs ``alerts`` + ``meta``) tel qu’écrit par le worker."""
     bucket = _bucket(pool)
     decoded_key = _require_prediction_key(key)
     try:

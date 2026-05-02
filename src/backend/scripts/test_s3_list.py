@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Liste (et optionnellement affiche un extrait) des objets S3 — mêmes variables que le dashboard.
+"""Liste (et optionnellement affiche un extrait) des objets S3 (buckets / préfixes via variables d’env).
 
 Usage :
-  cd repo && PYTHONPATH=src python3 src/backend/scripts/test_s3_list.py
-  PYTHONPATH=src python3 src/backend/scripts/test_s3_list.py --kind raw
-  PYTHONPATH=src python3 src/backend/scripts/test_s3_list.py --kind preds --peek 1
+  python3 src/backend/scripts/test_s3_list.py
+  python3 src/backend/scripts/test_s3_list.py --kind raw
+  python3 src/backend/scripts/test_s3_list.py --kind preds --peek 1
 
 Prérequis : identifiants AWS — profil CLI, variables d’environnement, ou fichier
 ``src/backend/.env.aws`` (comme ``check_s3_logs.py`` ; nécessite ``pip install python-dotenv``).
@@ -18,12 +18,7 @@ import os
 import sys
 from pathlib import Path
 
-_REPO = Path(__file__).resolve().parents[3]
-_SRC = _REPO / "src"
 _BACKEND_DIR = Path(__file__).resolve().parent.parent  # .../src/backend
-
-if _SRC.is_dir() and str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
 
 try:
     from dotenv import load_dotenv
@@ -37,9 +32,18 @@ else:
             print(f"(variables depuis {_p})", flush=True)
             break
 
-from backend.api import config  # noqa: E402
-
 import boto3  # noqa: E402
+
+RAW_BUCKET = os.getenv("RAW_LOGS_BUCKET", "clair-obscure-raw-logs").strip()
+RAW_PREFIX = os.getenv("RAW_LOGS_PREFIX", "raw/opensearch/logs-raw/").strip()
+REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "eu-west-3"))
+PREDICTIONS_BUCKET = os.getenv("PREDICTIONS_BUCKET", "model-attacks-predictions-tmp").strip()
+PREDICTIONS_BUCKET_TMP = os.getenv("PREDICTIONS_BUCKET_TMP", "model-attacks-predictions-tmp").strip()
+PREDICTIONS_PREFIX = (
+    os.getenv("PREDICTIONS_PREFIX", os.getenv("S3_PREFIX", "predictions/")).strip() or "predictions/"
+)
+if not PREDICTIONS_PREFIX.endswith("/"):
+    PREDICTIONS_PREFIX += "/"
 
 
 def _print_credential_help() -> None:
@@ -70,8 +74,7 @@ Aucune chaîne d’identifiants AWS n’est disponible pour boto3. Choisis une o
 
 
 def _client():
-    region = config.REGION
-    return boto3.client("s3", region_name=region)
+    return boto3.client("s3", region_name=REGION)
 
 
 def list_keys(bucket: str, prefix: str, max_keys: int) -> list[dict]:
@@ -102,7 +105,7 @@ def peek_object(bucket: str, key: str, max_chars: int) -> None:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description="Test list / lecture S3 (dashboard)")
+    p = argparse.ArgumentParser(description="Test list / lecture S3")
     p.add_argument(
         "--kind",
         choices=("raw", "preds", "preds_tmp"),
@@ -114,13 +117,13 @@ def main() -> int:
     args = p.parse_args()
 
     if args.kind == "raw":
-        bucket, prefix = config.RAW_BUCKET, config.RAW_PREFIX
+        bucket, prefix = RAW_BUCKET, RAW_PREFIX
     elif args.kind == "preds":
-        bucket, prefix = config.PREDICTIONS_BUCKET, config.PREDICTIONS_PREFIX
+        bucket, prefix = PREDICTIONS_BUCKET, PREDICTIONS_PREFIX
     else:
-        bucket, prefix = config.PREDICTIONS_BUCKET_TMP, config.PREDICTIONS_PREFIX
+        bucket, prefix = PREDICTIONS_BUCKET_TMP, PREDICTIONS_PREFIX
 
-    print(f"Région : {config.REGION}", flush=True)
+    print(f"Région : {REGION}", flush=True)
     print(f"Bucket : {bucket}", flush=True)
     print(f"Préfixe: {prefix!r}\n", flush=True)
 
