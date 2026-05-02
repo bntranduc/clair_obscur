@@ -5,11 +5,11 @@ keys/
 .env
 .env.*
 !.env.example
-# direnv / exports locaux souvent avec AWS_* ou tokens
+!**/.env.example
 .envrc
 .direnv/
-# copie accidentelle de ~/.aws à la racine du repo
 .aws/
+**/.env.aws
 
 # Compose / overrides locaux avec secrets
 docker-compose.override.yml
@@ -32,8 +32,13 @@ pip-wheel-metadata/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.tox/
+.hypothesis/
 .coverage
+.coverage.*
 htmlcov/
+coverage.xml
+*.cover
 
 # --- Jupyter ---
 .ipynb_checkpoints/
@@ -47,6 +52,18 @@ model.tar.gz
 nohup.out
 *.pid
 
+# --- Node / Next.js ---
+node_modules/
+.next/
+out/
+.turbo/
+.vercel/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
 # --- IDE / OS ---
 .idea/
 .vscode/
@@ -54,6 +71,7 @@ nohup.out
 *~
 .DS_Store
 Thumbs.db
+*.orig
 
 # --- Logs & tmp projet ---
 *.log

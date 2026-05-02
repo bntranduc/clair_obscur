@@ -1,5 +1,5 @@
-import { AlertsPoolView } from "../components/AlertsPoolView";
+import { AlertsExplorer } from "@/components/dashboard/AlertsExplorer";
 
 export default function AlertsPage() {
-  return <AlertsPoolView pool="prod" title="Alertes" bucketLabel="bucket production" />;
+  return <AlertsExplorer autoSelectFirst />;
 }

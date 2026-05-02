@@ -1,4 +1,4 @@
-"""Logs : lecture depuis S3 (liste d'objets, échantillon JSONL normalisé)."""
+"""Logs : liste d'objets S3 + échantillon JSONL normalisé."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from urllib.parse import unquote
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.api import config
-from backend.api.deps import s3_client
+from api import config
+from api.deps import s3_client
 from backend.log.normalization.normalize import ALL_FIELDS, normalize
 
 router = APIRouter(tags=["logs"])
@@ -25,7 +25,6 @@ def list_log_objects(
     max_keys: int = Query(50, ge=1, le=500),
     continuation_token: str | None = None,
 ) -> dict[str, Any]:
-    """Liste les clés d'objets sous le préfixe brut (partitions dt=/hour=…)."""
     kwargs: dict[str, Any] = {
         "Bucket": config.RAW_BUCKET,
         "Prefix": config.RAW_PREFIX,
@@ -57,11 +56,10 @@ def list_log_objects(
 
 @router.get("/s3-sample")
 def sample_log_lines(
-    key: str = Query(..., description="Clé S3 complète (URL-encodée si besoin)"),
+    key: str = Query(..., description="Clé S3 (URL-encodée si besoin)"),
     offset_lines: int = Query(0, ge=0),
     limit_lines: int = Query(100, ge=1, le=500),
 ) -> dict[str, Any]:
-    """Lit un fichier JSONL(.gz) OpenSearch : une ligne = un hit ; on expose ``_source`` normalisé."""
     decoded_key = unquote(key)
     if not decoded_key.startswith(config.RAW_PREFIX):
         raise HTTPException(

@@ -9,7 +9,7 @@ Variables d'environnement :
   PREDICT_MODE           ``inline`` = ``predict_alerts`` en process ;
                          ``http`` (défaut) = POST vers ``PREDICT_API_URL/predict``
   PREDICT_API_URL        Base API si mode http (défaut http://127.0.0.1:8080)
-  OUTPUT_BUCKET          Défaut model-attacks-predictions
+  OUTPUT_BUCKET          Défaut model-attacks-predictions-tmp
   OUTPUT_PREFIX          Défaut predictions/
   AWS_REGION             Défaut eu-west-3
   AWS_PROFILE            Profil SSO / CLI (optionnel)
@@ -231,7 +231,7 @@ def main() -> int:
     region = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "eu-west-3"))
     predict_mode = os.getenv("PREDICT_MODE", "http").strip()
     predict_base = os.getenv("PREDICT_API_URL", "http://127.0.0.1:8080").rstrip("/")
-    out_bucket = os.getenv("OUTPUT_BUCKET", "model-attacks-predictions").strip()
+    out_bucket = os.getenv("OUTPUT_BUCKET", "model-attacks-predictions-tmp").strip()
     predict_timeout = int(os.getenv("PREDICT_TIMEOUT_SEC", "900"))
     wait_sec = int(os.getenv("SQS_WAIT_TIME_SECONDS", "20"))
     vis_timeout = int(os.getenv("SQS_VISIBILITY_TIMEOUT", "900"))

@@ -4,6 +4,8 @@ Pipeline : événements normalisés → règles (`detect_signals_window_1h`) →
 
 ## Sur EC2 (Amazon Linux / même famille)
 
+**Dépannage rapide (SSO expiré, permissions `~/.aws`, Compose)** : voir **`README_EC2.md`** à la racine du dépôt.
+
 Depuis la racine du dépôt (`~/clair_obscur` ou équivalent), après `git pull` :
 
 ### 1. Dépendances Python
@@ -109,7 +111,7 @@ export AWS_PROFILE=bao   # ton profil SSO
 ./src/backend/scripts/run_model_docker.sh
 ```
 
-API **+ worker SQS** (prédictions écrites dans `s3://model-attacks-predictions/predictions/` par défaut) : renseigne **`SQS_QUEUE_URL`** dans `.env`, puis :
+API **+ worker SQS** (prédictions écrites dans `s3://model-attacks-predictions-tmp/predictions/` par défaut ; surcharge **`OUTPUT_BUCKET`**) : renseigne **`SQS_QUEUE_URL`** dans `.env`, puis :
 
 ```bash
 ./src/backend/scripts/run_model_docker.sh --profile sqs

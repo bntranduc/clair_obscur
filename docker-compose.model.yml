@@ -4,7 +4,7 @@
 #     docker compose --profile sqs -f docker-compose.model.yml up --build
 #
 # Worker : poll SQS (messages S3), télécharge le JSONL.gz, predict_alerts (inline),
-# écrit dans OUTPUT_BUCKET (défaut model-attacks-predictions/predictions/).
+# écrit dans OUTPUT_BUCKET (défaut model-attacks-predictions-tmp/predictions/).
 services:
   model:
     build:
@@ -50,7 +50,7 @@ services:
       AWS_PROFILE: ${AWS_PROFILE:-}
       SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
       PREDICT_MODE: ${PREDICT_MODE:-inline}
-      OUTPUT_BUCKET: ${OUTPUT_BUCKET:-model-attacks-predictions}
+      OUTPUT_BUCKET: ${OUTPUT_BUCKET:-model-attacks-predictions-tmp}
       OUTPUT_PREFIX: ${OUTPUT_PREFIX:-predictions/}
       PREDICT_API_URL: ${PREDICT_API_URL:-http://model:8080}
       BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-}
