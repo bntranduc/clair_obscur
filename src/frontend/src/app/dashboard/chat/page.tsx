@@ -1,5 +1,5 @@
-import { ChatbotPanel } from "@/components/dashboard/ChatbotPanel";
+import PlaceholderPanel from "@/components/dashboard/PlaceholderPanel";
 
-export default function DashboardChatPage() {
-  return <ChatbotPanel />;
+export default function ChatPage() {
+  return <PlaceholderPanel title="Assistant IA" />;
 }

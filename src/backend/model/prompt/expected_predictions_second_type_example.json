@@ -1,0 +1,54 @@
+[
+  {
+    "challenge_id": "credential_stuffing",
+    "severity": "medium",
+    "alert_summary": "Single IP spraying authentication failures across many accounts; credential stuffing pattern with 120+ distinct users targeted.",
+    "detection": {
+      "attack_type": "credential_stuffing",
+      "attacker_ips": ["203.0.113.50"],
+      "victim_accounts": ["svc_api", "batch_user"],
+      "attack_start_time": "2026-01-15T09:30:00Z",
+      "attack_end_time": "2026-01-15T09:55:00Z",
+      "indicators": {
+        "rule_ids": ["credential_spray"],
+        "distinct_users_targeted": 120
+      }
+    },
+    "detection_time_seconds": 300,
+    "confidence": {
+      "challenge_id": 0.91,
+      "severity": 0.82,
+      "alert_summary": 0.88,
+      "remediation_proposal": 0.84,
+      "detection": {
+        "attack_type": 0.9,
+        "attacker_ips": [0.89],
+        "victim_accounts": [0.84, 0.82],
+        "attack_start_time": 0.86,
+        "attack_end_time": 0.85,
+        "indicators": 0.83
+      },
+      "detection_time_seconds": 1.0
+    },
+    "reasons": {
+      "challenge_id": "Aligned with credential_stuffing (multi-account spray from one source).",
+      "severity": "Medium: broad user impact but no confirmed account takeover in the aggregated window; escalation if successes appear.",
+      "alert_summary": "Highlights single-source spray and scale (distinct_users_targeted) from credential_spray rule context.",
+      "remediation_proposal": "Rate-limit and temporarily block the source IP; force password resets for impacted accounts; enable MFA; review lockout and CAPTCHA policies on the auth endpoint.",
+      "detection": {
+        "attack_type": "Many distinct users failed auth from one IP — spray pattern, not focused SSH BF.",
+        "attacker_ips": ["Single origin for the majority of multi-user failures in the window."],
+        "victim_accounts": [
+          "Application account with high failure volume vs baseline.",
+          "Batch account co-targeted in the same bursts."
+        ],
+        "attack_start_time": "Start when multi-user failure density crosses the rule threshold.",
+        "attack_end_time": "End of active phase before marginal failure rate.",
+        "indicators": "rule_ids includes credential_spray; distinct_users_targeted summarizes spray breadth."
+      },
+      "detection_time_seconds": "Constant 300 from pipeline."
+    },
+    "exhaustive_analysis": "From 09:30 to 09:55 UTC one source (203.0.113.50) generated many auth failures across many accounts (svc_api, batch_user among others). Pattern is credential stuffing/spray: one attacker, wide victim set. distinct_users_targeted quantifies scope. Actions: MFA, temporary block, account review.",
+    "remediation_proposal": "1) Block 203.0.113.50 at WAF/API gateway. 2) Invalidate sessions for high-risk accounts; mandatory MFA enrollment. 3) Tune credential_spray thresholds and add progressive delays. 4) Check for successful logins from the same IP in adjacent windows."
+  }
+]

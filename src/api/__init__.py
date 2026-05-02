@@ -1,1 +1,1 @@
-"""API HTTP minimale (logs S3) pour le frontend."""
+"""HTTP API (FastAPI) pour le dashboard — logs S3 normalisés, etc."""

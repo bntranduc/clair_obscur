@@ -27,6 +27,8 @@ venv/
 dist/
 build/
 pip-wheel-metadata/
+.dmypy.json
+dmypy.json
 
 # --- Tests / linters ---
 .pytest_cache/
@@ -63,6 +65,16 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+# Variables d’environnement locales du front (déjà couvert par .env.* ci-dessus ; explicite pour clarté)
+.env*.local
+
+# --- Caches & rapports (outils front / e2e) ---
+.cache/
+.eslintcache
+.parcel-cache/
+playwright-report/
+test-results/
+blob-report/
 
 # --- IDE / OS ---
 .idea/
@@ -76,6 +88,7 @@ Thumbs.db
 # --- Logs & tmp projet ---
 *.log
 /tmp/
+tmp/
 
 datasets/**
 !datasets/fake_data/

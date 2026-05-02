@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Fetch the 100 latest logs from OpenSearch (logs-raw) and call the local model API
-running in Docker (`POST /predict_attack`) to get an attack_type for each log.
+(`POST /predict_attack`) to get an attack_type for each log.
 
 Minimal deps:
   - opensearchpy (already used in repo scripts)
