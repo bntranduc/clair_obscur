@@ -1,24 +1,306 @@
 @import "tailwindcss";
 
+/* Design tokens — sombre, contraste maîtrisé, accent cyan */
 :root {
-  --background: #000000;
-  --foreground: #ededed;
+  --bg-base: #09090b;
+  --bg-elevated: #0f0f12;
+  --bg-surface: #18181c;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.11);
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --accent: #22d3ee;
+  --accent-dim: rgba(34, 211, 238, 0.12);
+  --accent-glow: rgba(34, 211, 238, 0.25);
+  --brand-violet: #a78bfa;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --shadow-panel: 0 0 0 1px var(--border), 0 4px 24px -4px rgba(0, 0, 0, 0.55),
+    0 12px 48px -12px rgba(0, 0, 0, 0.35);
+}
+
+@theme inline {
+  --color-background: var(--bg-base);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: system-ui, sans-serif;
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.glass-effect {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(10px);
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
+::selection {
+  background: rgba(34, 211, 238, 0.25);
+  color: #fff;
 }
 
-.glass-panel {
-  background: rgba(255, 255, 255, 0.02);
-  backdrop-filter: blur(8px);
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0c;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 6px;
+  border: 2px solid #0a0a0c;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+/* Sidebar glass */
+.sidebar-glass {
+  background: linear-gradient(180deg, rgba(24, 24, 27, 0.92) 0%, rgba(9, 9, 11, 0.98) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid var(--border);
+}
+
+/* Dashboard — ambiance CND / SOC : base “bunker”, halos discrets */
+.app-main-bg {
+  background:
+    radial-gradient(ellipse 110% 60% at 50% -5%, rgba(30, 58, 95, 0.22), transparent 52%),
+    radial-gradient(ellipse 80% 50% at 100% 100%, rgba(45, 64, 45, 0.12), transparent 48%),
+    linear-gradient(185deg, #05080c 0%, #080c12 42%, #06090e 100%);
+}
+
+/* Halos tactiques (armée / cyber-défense) — teintes marine, olive, console SOC */
+.dashboard-aurora {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* Secteur “radar” / veille cyber — teal institutionnel très bas */
+.dashboard-aurora--a {
+  width: min(88vw, 54rem);
+  height: min(88vw, 54rem);
+  top: -20%;
+  left: -10%;
+  background: radial-gradient(circle at 28% 32%, rgba(14, 116, 144, 0.22), transparent 60%);
+  animation: dashboard-float-a 40s ease-in-out infinite;
+}
+
+/* Bleu nuit type carte op / C2 */
+.dashboard-aurora--b {
+  width: min(78vw, 46rem);
+  height: min(78vw, 46rem);
+  bottom: -24%;
+  right: -14%;
+  background: radial-gradient(circle at 55% 48%, rgba(30, 64, 110, 0.28), transparent 58%);
+  animation: dashboard-float-b 46s ease-in-out infinite;
+}
+
+/* Olive tactique + ambre veille (très léger) */
+.dashboard-aurora--c {
+  width: min(52vw, 30rem);
+  height: min(52vw, 30rem);
+  top: 36%;
+  left: 40%;
+  opacity: 0.5;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(74, 92, 62, 0.18), transparent 58%),
+    radial-gradient(circle at 70% 30%, rgba(180, 130, 50, 0.06), transparent 45%);
+  animation: dashboard-float-c 52s ease-in-out infinite;
+}
+
+@keyframes dashboard-float-a {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.85;
+  }
+  45% {
+    transform: translate(6%, 10%) scale(1.06);
+    opacity: 1;
+  }
+  70% {
+    transform: translate(2%, 4%) scale(1.02);
+    opacity: 0.9;
+  }
+}
+
+@keyframes dashboard-float-b {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.75;
+  }
+  40% {
+    transform: translate(-7%, -6%) scale(1.08);
+    opacity: 0.95;
+  }
+  65% {
+    transform: translate(-3%, -12%) scale(1.03);
+    opacity: 0.82;
+  }
+}
+
+@keyframes dashboard-float-c {
+  0%,
+  100% {
+    transform: translate(-4%, 2%) scale(1);
+  }
+  50% {
+    transform: translate(5%, -5%) scale(1.12);
+  }
+}
+
+/* Grille type carte / coordonnées (CND) — lignes fines style terminal */
+.dashboard-tactical-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(56, 165, 200, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 165, 200, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.35) 78%, transparent 100%);
+  opacity: 0.55;
+  animation: dashboard-tactical-grid-pulse 28s ease-in-out infinite;
+}
+
+@keyframes dashboard-tactical-grid-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.62;
+  }
+}
+
+/* Balayage vertical discret (scope / veille) */
+.dashboard-tactical-sweep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.dashboard-tactical-sweep::before {
+  content: "";
+  position: absolute;
+  left: -5%;
+  width: 110%;
+  height: min(45vh, 22rem);
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(56, 189, 248, 0.035) 45%,
+    rgba(34, 197, 94, 0.02) 55%,
+    transparent 100%
+  );
+  animation: dashboard-tactical-sweep 14s linear infinite;
+  will-change: transform;
+}
+
+@keyframes dashboard-tactical-sweep {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(calc(100vh + 100%));
+  }
+}
+
+/* Grille SVG d’origine — teinte plus “carte” */
+.grid-overlay {
+  background-image: url("/grid.svg");
+  opacity: 0.055;
+  mask-image: linear-gradient(180deg, black 0%, transparent 86%);
+  animation: dashboard-grid-breathe 24s ease-in-out infinite;
+  filter: hue-rotate(165deg) saturate(0.65) brightness(0.95);
+}
+
+@keyframes dashboard-grid-breathe {
+  0%,
+  100% {
+    opacity: 0.048;
+  }
+  50% {
+    opacity: 0.075;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-aurora--a,
+  .dashboard-aurora--b,
+  .dashboard-aurora--c,
+  .grid-overlay,
+  .dashboard-tactical-grid,
+  .dashboard-tactical-sweep::before {
+    animation: none !important;
+  }
+
+  .dashboard-aurora--c {
+    opacity: 0.35;
+  }
+
+  .dashboard-tactical-sweep::before {
+    transform: translateY(40vh);
+    opacity: 0.5;
+  }
+}
+
+/* Transition entre vues du dashboard (onglets / routes) */
+@keyframes dashboard-route-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dashboard-route-enter {
+  animation: dashboard-route-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-route-enter {
+    animation: dashboard-route-fade 0.2s ease-out both;
+  }
+
+  @keyframes dashboard-route-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
+/* Panel card */
+.panel {
+  background: linear-gradient(165deg, rgba(24, 24, 27, 0.65) 0%, rgba(15, 15, 18, 0.85) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-panel);
+}
+
+/* Focus visible — accessibilité */
+.focus-ring:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }

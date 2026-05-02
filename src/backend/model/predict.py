@@ -17,6 +17,7 @@ def predict_alerts(
     max_tokens: int = 4096,
     profile_name: str | None = None,
 ) -> list[dict[str, Any]]:
+    """Retourne une liste d’alertes dict (``severity``, ``alert_summary``, ``detection``, ``confidence``, ``reasons``, ``exhaustive_analysis``, ``remediation_proposal``, etc.)."""
     incidents = aggregate_signals(detect_signals_window_1h(events))
     if not incidents:
         return []

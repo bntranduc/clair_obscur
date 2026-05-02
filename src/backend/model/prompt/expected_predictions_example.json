@@ -1,0 +1,58 @@
+[
+  {
+    "challenge_id": "ssh_brute_force",
+    "severity": "high",
+    "alert_summary": "Repeated SSH authentication failures from two sources against privileged and user accounts; automated brute-force pattern with 400+ failures in 14 minutes.",
+    "detection": {
+      "attack_type": "ssh_brute_force",
+      "attacker_ips": ["198.51.100.10", "198.51.100.11"],
+      "victim_accounts": ["root", "ubuntu"],
+      "attack_start_time": "2026-01-15T08:00:01Z",
+      "attack_end_time": "2026-01-15T08:14:22Z",
+      "indicators": {
+        "rule_ids": ["ssh_burst", "ssh_failures"],
+        "failure_count": 412,
+        "distinct_usernames": 2
+      }
+    },
+    "detection_time_seconds": 300,
+    "confidence": {
+      "challenge_id": 0.94,
+      "severity": 0.91,
+      "alert_summary": 0.9,
+      "remediation_proposal": 0.86,
+      "detection": {
+        "attack_type": 0.93,
+        "attacker_ips": [0.91, 0.88],
+        "victim_accounts": [0.9, 0.87],
+        "attack_start_time": 0.89,
+        "attack_end_time": 0.88,
+        "indicators": 0.85
+      },
+      "detection_time_seconds": 1.0
+    },
+    "reasons": {
+      "challenge_id": "challenge_id matches attack_type for correlation with playbooks.",
+      "severity": "High: high failure volume, privileged account (root) in target set, and sustained parallel sources increase compromise risk.",
+      "alert_summary": "Distilled from rule firings, IP list, user list, and time window in the aggregated incidents.",
+      "remediation_proposal": "Block both attacker IPs at the edge firewall; enforce MFA on SSH for privileged accounts; disable password auth for root if policy allows; review successful SSH sessions after the window for persistence.",
+      "detection": {
+        "attack_type": "SSH failure bursts and rule thresholds indicate brute force, not HTTP/SQL patterns.",
+        "attacker_ips": [
+          "Dominant source by failure volume in the aggregation window.",
+          "Secondary source with overlapping timeline and same victim set."
+        ],
+        "victim_accounts": [
+          "Most targeted privileged account in the window.",
+          "Secondary account with repeated failures from the same sources."
+        ],
+        "attack_start_time": "Earliest significant SSH failure after noise exclusion.",
+        "attack_end_time": "Last peak before activity drops to baseline.",
+        "indicators": "rule_ids from fired rules; failure_count and distinct_usernames derived from aggregated incidents."
+      },
+      "detection_time_seconds": "Pipeline constant (300) from prompt, not inferred from raw logs."
+    },
+    "exhaustive_analysis": "Between 08:00 and 08:14 UTC, two sources sent repeated SSH authentication failures against root and ubuntu. Rules ssh_burst and ssh_failures exceeded thresholds; over 400 failures and two distinct usernames targeted. Timeline and IP overlap suggest automated brute force. Recommend blocking sources, reviewing password policy, and checking for successful logins after the window.",
+    "remediation_proposal": "1) Block 198.51.100.10 and 198.51.100.11 at perimeter and SSH tier. 2) Rotate credentials for root/ubuntu if any success occurred; enable MFA or key-only auth. 3) Review sshd_config (PermitRootLogin, MaxAuthTries). 4) Hunt for lateral movement from same subnets in the following 24h."
+  }
+]

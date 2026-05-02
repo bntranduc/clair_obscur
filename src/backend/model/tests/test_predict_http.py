@@ -74,7 +74,7 @@ if __name__ == "__main__":
             f"Aucune réponse depuis {base}/predict ({e.reason}). "
             "Lance l’API du modèle (port 8080), ou définis PREDICT_BASE_URL vers une instance qui tourne.\n"
             "Exemple local : depuis la racine du repo,\n"
-            "  PYTHONPATH=src python3 -m uvicorn backend.model.serve_app:app --host 127.0.0.1 --port 8080\n"
+            "  PYTHONPATH=src python3 -m uvicorn api.model_app:app --host 127.0.0.1 --port 8080\n"
             "ou : ./src/backend/scripts/run_model_serve.sh"
         )
         raise SystemExit(hint) from e

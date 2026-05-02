@@ -1,4 +1,4 @@
-# Modèle — API Bedrock (`serve_app`)
+# Modèle — API Bedrock (`api.model_app`)
 
 Pipeline : événements normalisés → règles (`detect_signals_window_1h`) → agrégation → Claude via Bedrock → liste d’alertes JSON.
 
@@ -39,7 +39,7 @@ export AWS_DEFAULT_REGION=eu-west-3
 
 (Passe **`bao`** par le nom de ton profil.)
 
-Tu peux aussi mettre `AWS_PROFILE=bao` dans un fichier `.env` à la racine du repo pour les scripts qui font `load_dotenv` (ex. tests), mais **`serve_app` ne lit pas `.env`** : pour uvicorn, exporte les variables dans le shell ou utilise systemd/docker avec `environment`.
+Tu peux aussi mettre `AWS_PROFILE=bao` dans un fichier `.env` à la racine du repo pour les scripts qui font `load_dotenv` (ex. tests). L’API **`api.model_app`** charge ce `.env` au démarrage (comme `api.main`).
 
 **Sur EC2 avec rôle IAM sur l’instance** : ne définis pas `AWS_PROFILE` ; boto3 utilisera automatiquement les credentials du rôle.
 
@@ -55,7 +55,7 @@ Voir `.env.example` à la racine du repo (sans secrets statiques).
 ```bash
 cd ~/clair_obscur
 export PYTHONPATH="$PWD/src"
-python3 -m uvicorn backend.model.serve_app:app --host 0.0.0.0 --port 8080
+python3 -m uvicorn api.model_app:app --host 0.0.0.0 --port 8080
 ```
 
 Ou depuis n’importe où sous la racine du repo :
@@ -102,64 +102,18 @@ EOF
 
 Documentation interactive : `http://VOTRE_IP_PUBLIQUE:8080/docs`
 
-### 6. Docker (minimal)
-
-À la racine du dépôt. Le conteneur utilise **`AWS_PROFILE`** + le dossier **`~/.aws`** monté en lecture seule (après `aws sso login` sur la machine hôte). Optionnel : `.env` avec `AWS_PROFILE`, `BEDROCK_*` (voir `.env.example`).
-
-```bash
-export AWS_PROFILE=bao   # ton profil SSO
-./src/backend/scripts/run_model_docker.sh
-```
-
-API **+ worker SQS** (prédictions écrites dans `s3://model-attacks-predictions-tmp/predictions/` par défaut ; surcharge **`OUTPUT_BUCKET`**) : renseigne **`SQS_QUEUE_URL`** dans `.env`, puis :
-
-```bash
-./src/backend/scripts/run_model_docker.sh --profile sqs
-```
-
-Le worker tourne en boucle (**long polling** SQS, équivalent pratique à une tâche planifiée). Mode **`PREDICT_MODE=inline`** par défaut dans Compose : appelle **`predict_alerts`** sans passer par HTTP. Pour déléguer à l’API du même compose : `PREDICT_MODE=http` et `PREDICT_API_URL=http://model:8080`.
-
-Arrêt : `docker compose -f docker-compose.model.yml down`.  
-Arrière-plan : ajoute `-d` à la fin de la commande `docker compose`.
-
-Sans le script :
-
-```bash
-docker compose -f docker-compose.model.yml up --build
-docker compose --profile sqs -f docker-compose.model.yml up --build
-```
-
-Si la sous-commande `compose` n’existe pas sur ton EC2, installe le plugin Docker Compose ou utilise uniquement `docker build` / `docker run` (voir message d’erreur du script).
-
-**Credentials :** avec Compose, **`~/.aws` est monté depuis l’hôte** (écriture nécessaire pour le cache SSO sous `~/.aws/sso/cache`) et **`AWS_PROFILE`** est repris de l’hôte. Sur une EC2 qui ne s’authentifie **que** par rôle IAM (sans `~/.aws`), adapte ou retire le volume dans `docker-compose.model.yml`.
-
-Fais d’abord `aws sso login --profile …` sur la machine qui lance Docker, puis :
-
-```bash
-export AWS_PROFILE=bao
-docker compose -f docker-compose.model.yml up --build
-```
-
-Sans Compose :
-
-```bash
-docker build -f src/backend/model/Dockerfile -t clair-model .
-docker run --rm -p 8080:8080 -e AWS_REGION=eu-west-3 -e AWS_PROFILE=bao \
-  -v ~/.aws:/root/.aws clair-model
-```
+Chaque élément de `alerts` inclut `challenge_id`, **`severity`** (`low` \| `medium` \| `high` \| `critical`), **`alert_summary`** (résumé court), `detection`, `detection_time_seconds`, **`confidence`**, **`reasons`**, **`exhaustive_analysis`**, **`remediation_proposal`** (actions opérationnelles proposées). Constante `SEVERITY_LEVELS_SIEM` dans `incident_llm`. Voir `incident_llm.build_prediction_prompt`.
 
 ## Fichiers utiles
 
 | Fichier | Rôle |
 |--------|------|
-| `serve_app.py` | FastAPI `/health`, `/predict` |
+| `prompt/expected_predictions_example.json` | Exemple embarqué (ssh_brute_force) injecté dans le prompt Bedrock |
+| `prompt/expected_predictions_second_type_example.json` | Deuxième exemple (credential_stuffing) |
+| `src/api/model_app.py` | FastAPI `/health`, `/predict`, `/api/v1/analytics/siem` |
 | `predict.py` | `predict_alerts(events, …)` (profil AWS / chaîne boto3) |
 | `requirements-api.txt` | Dépendances pour l’API |
-| `Dockerfile` | Image avec uvicorn |
-| `../../docker-compose.model.yml` | Compose : build + port 8080 + `.env` |
-| `../../.dockerignore` | Contexte de build allégé |
 | `../scripts/run_model_serve.sh` | Lance uvicorn avec `PYTHONPATH` correct |
-| `../scripts/run_model_docker.sh` | Build + Compose (`--profile sqs` pour le worker) |
 | `../scripts/sqs_predict_worker.py` | Worker SQS → S3 logs → prédictions → S3 JSON |
 
 Le modèle `.env` versionné est à la racine du repo : `.env.example`.

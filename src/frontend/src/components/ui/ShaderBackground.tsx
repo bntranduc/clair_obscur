@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
-export default function ShaderBackground() {
+const ShaderBackground = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     camera: THREE.Camera;
@@ -109,7 +109,7 @@ export default function ShaderBackground() {
       if (sceneRef.current) {
         cancelAnimationFrame(sceneRef.current.animationId);
 
-        if (container && sceneRef.current.renderer.domElement.parentNode === container) {
+        if (container && sceneRef.current.renderer.domElement) {
           container.removeChild(sceneRef.current.renderer.domElement);
         }
 
@@ -130,4 +130,6 @@ export default function ShaderBackground() {
       }}
     />
   );
-}
+};
+
+export default ShaderBackground;

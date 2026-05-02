@@ -1,0 +1,357 @@
+{
+  "alerts": [
+    {
+      "challenge_id": "ssh_brute_force",
+      "severity": "high",
+      "alert_summary": "Force brute SSH : une IP, compte root ciblé, volume d’échecs élevé.",
+      "detection": {
+        "attack_type": "ssh_brute_force",
+        "attacker_ips": [
+          "198.51.100.1"
+        ],
+        "victim_accounts": [
+          "root"
+        ],
+        "attack_start_time": "2026-02-01T06:00:00Z",
+        "attack_end_time": "2026-02-01T06:10:00Z",
+        "indicators": {
+          "failures": 250
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.93,
+        "severity": 0.88,
+        "alert_summary": 0.87,
+        "remediation_proposal": 0.84,
+        "detection": {
+          "attack_type": 0.92,
+          "attacker_ips": [
+            0.91
+          ],
+          "victim_accounts": [
+            0.9
+          ],
+          "attack_start_time": 0.88,
+          "attack_end_time": 0.87,
+          "indicators": 0.86
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "challenge_id = attack_type pour corrélation playbook.",
+        "severity": "Justification niveau high selon impact et surface (voir incidents agrégés).",
+        "alert_summary": "Résumé dérivé du type d’attaque, des acteurs et des indicateurs clés.",
+        "remediation_proposal": "Bloquer la source au pare-feu SSH, renforcer l’auth (MFA, clés), auditer les sessions réussies post-fenêtre.",
+        "detection": {
+          "attack_type": "Échecs SSH concentrés sur une IP et un compte privilégié, volume compatible brute force.",
+          "attacker_ips": [
+            "Source unique dominante sur la fenêtre d’agrégation."
+          ],
+          "victim_accounts": [
+            "Compte le plus frappé par les échecs SSH successifs."
+          ],
+          "attack_start_time": "Min des timestamps d’échec significatifs.",
+          "attack_end_time": "Max des timestamps avant retombée du débit.",
+          "indicators": "failures agrège le nombre d’échecs comptabilisés par les règles."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit — 2026-02-01 06:00–06:10 UTC : une source unique mène une campagne d’échecs SSH répétés contre le compte root. Volume et fenêtre courte compatibles avec une attaque automatisée par dictionnaire ou credential reuse ; les incidents agrégés montrent une concentration des échecs sur cette paire source/victime. Actions : contrôler les journaux d’auth, verrouiller root si exposé, filtrer la source.",
+      "remediation_proposal": "1) Bloquer 198.51.100.1 en entrée SSH/WAF. 2) Désactiver l’auth par mot de passe pour root ou restreindre aux clés. 3) Activer MFA sur les comptes privilégiés. 4) Passer en revue les connexions réussies sur la fenêtre ±1 h."
+    },
+    {
+      "challenge_id": "credential_stuffing",
+      "severity": "medium",
+      "alert_summary": "Spray d’identifiants : une source, plusieurs comptes (u1–u3).",
+      "detection": {
+        "attack_type": "credential_stuffing",
+        "attacker_ips": [
+          "203.0.113.2"
+        ],
+        "victim_accounts": [
+          "u1",
+          "u2",
+          "u3"
+        ],
+        "attack_start_time": "2026-02-01T07:00:00Z",
+        "attack_end_time": "2026-02-01T07:45:00Z",
+        "indicators": {
+          "distinct_users": 15
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.9,
+        "severity": 0.88,
+        "alert_summary": 0.87,
+        "remediation_proposal": 0.83,
+        "detection": {
+          "attack_type": 0.89,
+          "attacker_ips": [
+            0.88
+          ],
+          "victim_accounts": [
+            0.82,
+            0.81,
+            0.8
+          ],
+          "attack_start_time": 0.85,
+          "attack_end_time": 0.84,
+          "indicators": 0.83
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Aligné sur credential_stuffing (spray multi-comptes).",
+        "severity": "Justification niveau medium selon impact et surface (voir incidents agrégés).",
+        "alert_summary": "Résumé dérivé du type d’attaque, des acteurs et des indicateurs clés.",
+        "remediation_proposal": "Limiter le débit par IP, MFA obligatoire, réinitialisations ciblées pour comptes à risque.",
+        "detection": {
+          "attack_type": "Une source, plusieurs victimes distinctes — motif stuffing plutôt que BF SSH focalisée.",
+          "attacker_ips": [
+            "Source à l’origine du spray sur u1/u2/u3."
+          ],
+          "victim_accounts": [
+            "Compte vu dans les premières vagues d’échecs.",
+            "Compte secondaire touché dans la même fenêtre.",
+            "Compte tertiaire avec corrélation temporelle serrée."
+          ],
+          "attack_start_time": "Début de la phase où le seuil multi-utilisateurs est dépassé.",
+          "attack_end_time": "Fin de la phase avant retour baseline.",
+          "indicators": "distinct_users résume l’écart-type du spray côté victimes."
+        },
+        "detection_time_seconds": "Constante pipeline."
+      },
+      "exhaustive_analysis": "Récit — 07:00–07:45 UTC : depuis 203.0.113.2, salve d’échecs d’authentification touchant de nombreux comptes (u1–u3 et au-delà). Pattern spray : une source, dispersion des victimes, distinct_users élevé dans les agrégats. À traiter comme campagne de credential stuffing plutôt que BF SSH ciblée ; priorité révocation/MFA et blocage source.",
+      "remediation_proposal": "1) Bloquer 203.0.113.2 au bordure API/login. 2) Forcer MFA et révoquer sessions pour u1–u3 si compromission plausible. 3) Ajouter délais progressifs / CAPTCHA sur l’endpoint. 4) Corréler les succès depuis la même IP sur ±2 h."
+    },
+    {
+      "challenge_id": "sql_injection",
+      "severity": "high",
+      "alert_summary": "Injection SQL : requêtes applicatives avec charges UNION/OR.",
+      "detection": {
+        "attack_type": "sql_injection",
+        "attacker_ips": [
+          "198.51.100.9"
+        ],
+        "victim_accounts": [],
+        "attack_start_time": "2026-02-01T08:00:00Z",
+        "attack_end_time": "2026-02-01T08:05:00Z",
+        "indicators": {
+          "union_select": true
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.88,
+        "severity": 0.88,
+        "alert_summary": 0.87,
+        "remediation_proposal": 0.82,
+        "detection": {
+          "attack_type": 0.87,
+          "attacker_ips": [
+            0.86
+          ],
+          "victim_accounts": [],
+          "attack_start_time": 0.84,
+          "attack_end_time": 0.83,
+          "indicators": 0.81
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Aligné sur sql_injection (couche application).",
+        "severity": "Justification niveau high selon impact et surface (voir incidents agrégés).",
+        "alert_summary": "Résumé dérivé du type d’attaque, des acteurs et des indicateurs clés.",
+        "remediation_proposal": "Requêtes paramétrées, validation stricte des entrées, règles WAF, revue du code des endpoints exposés.",
+        "detection": {
+          "attack_type": "URIs et paramètres contenant des motifs UNION/OR typiques SQLi dans les logs applicatifs.",
+          "attacker_ips": [
+            "Client HTTP à l’origine des requêtes suspectes."
+          ],
+          "victim_accounts": [],
+          "attack_start_time": "Première requête malformée significative.",
+          "attack_end_time": "Dernière tentative dans la salve.",
+          "indicators": "union_select reflète la présence explicite de UNION SELECT dans les preuves."
+        },
+        "detection_time_seconds": "Constante pipeline."
+      },
+      "exhaustive_analysis": "Récit — 08:00–08:05 UTC : la source 198.51.100.9 envoie des requêtes applicatives contenant des charges SQLi (UNION). Pas de compte victime applicatif identifié dans les agrégats ; la menace porte sur l’intégrité des données et l’accès backend. Corriger les paramètres, WAF, requêtes préparées.",
+      "remediation_proposal": "1) Corriger les requêtes SQL (ORM / prepared statements). 2) Déployer ou renforcer WAF (règles SQLi). 3) Bloquer temporairement 198.51.100.9 si attaque confirmée. 4) Auditer les journaux DB pour exfiltration."
+    },
+    {
+      "challenge_id": "directory_traversal",
+      "severity": "medium",
+      "alert_summary": "Parcours de chemins : segments ../ vers fichiers système.",
+      "detection": {
+        "attack_type": "directory_traversal",
+        "attacker_ips": [
+          "198.51.100.9"
+        ],
+        "victim_accounts": [],
+        "attack_start_time": "2026-02-01T08:12:00Z",
+        "attack_end_time": "2026-02-01T08:13:00Z",
+        "indicators": {
+          "paths_seen": 4
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.86,
+        "severity": 0.88,
+        "alert_summary": 0.87,
+        "remediation_proposal": 0.81,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.84
+          ],
+          "victim_accounts": [],
+          "attack_start_time": 0.82,
+          "attack_end_time": 0.81,
+          "indicators": 0.8
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Aligné sur directory_traversal.",
+        "severity": "Justification niveau medium selon impact et surface (voir incidents agrégés).",
+        "alert_summary": "Résumé dérivé du type d’attaque, des acteurs et des indicateurs clés.",
+        "remediation_proposal": "Normaliser les chemins côté serveur, chroot/jail pour fichiers servis, bloquer séquences ../ en entrée.",
+        "detection": {
+          "attack_type": "Séquences .. / encodées et chemins sensibles dans URI.",
+          "attacker_ips": [
+            "Même host applicatif que les requêtes traversales."
+          ],
+          "victim_accounts": [],
+          "attack_start_time": "Début de la séquence de probes sur chemins relatifs.",
+          "attack_end_time": "Fin de la rafale courte.",
+          "indicators": "paths_seen compte les variantes de chemins suspects observés."
+        },
+        "detection_time_seconds": "Constante pipeline."
+      },
+      "exhaustive_analysis": "Récit — 08:12–08:13 UTC : séquence courte de requêtes HTTP avec chemins relatifs et encodages (..%2f) typiques d’accès fichiers ; source 198.51.100.9. Risque lecture de fichiers sensibles ; durcir l’appli et normaliser les chemins.",
+      "remediation_proposal": "1) Valider et canoniser les chemins (refuser ..). 2) Servir uniquement depuis répertoires autorisés. 3) Mettre à jour dépendances si LFI connue. 4) Bloquer 198.51.100.9 en attente de correctif."
+    },
+    {
+      "challenge_id": "ssrf",
+      "severity": "high",
+      "alert_summary": "SSRF : callbacks vers hôtes internes / métadonnées.",
+      "detection": {
+        "attack_type": "ssrf",
+        "attacker_ips": [
+          "203.0.113.99"
+        ],
+        "victim_accounts": [],
+        "attack_start_time": "2026-02-01T09:00:00Z",
+        "attack_end_time": "2026-02-01T09:02:00Z",
+        "indicators": {
+          "callback_hosts": [
+            "169.254.169.254"
+          ]
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.84,
+        "severity": 0.88,
+        "alert_summary": 0.87,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.83,
+          "attacker_ips": [
+            0.82
+          ],
+          "victim_accounts": [],
+          "attack_start_time": 0.8,
+          "attack_end_time": 0.79,
+          "indicators": 0.78
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Aligné sur ssrf.",
+        "severity": "Justification niveau high selon impact et surface (voir incidents agrégés).",
+        "alert_summary": "Résumé dérivé du type d’attaque, des acteurs et des indicateurs clés.",
+        "remediation_proposal": "Liste blanche d’URL de callback, pas de résolution vers RFC1918/169.254, segmentation réseau du service.",
+        "detection": {
+          "attack_type": "Paramètres URL ou corps de requête pointant vers métadonnées / réseaux internes.",
+          "attacker_ips": [
+            "Origine des requêtes vers URL internes ou magic IPs."
+          ],
+          "victim_accounts": [],
+          "attack_start_time": "Premier callback vers 169.254.169.254 ou équivalent.",
+          "attack_end_time": "Dernière tentative SSRF dans la fenêtre.",
+          "indicators": "callback_hosts liste les cibles réseau suspectes extraites des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline."
+      },
+      "exhaustive_analysis": "Récit — 09:00–09:02 UTC : 203.0.113.99 tente d’atteindre des cibles internes (ex. métadonnées cloud via 169.254.169.254). SSRF : risque d’accès au plan de contrôle interne ; isoler le service, valider les URL de callback, filtrer les schémas.",
+      "remediation_proposal": "1) Refuser les schémas non HTTP(S) et les cibles link-local. 2) Proxy HTTP interne avec liste blanche. 3) Isoler le workload en réseau. 4) Bloquer 203.0.113.99 et auditer les appels sortants de l’appli."
+    },
+    {
+      "challenge_id": "exfiltration",
+      "severity": "critical",
+      "alert_summary": "Transfert sortant volumineux depuis compte backup vers zones atypiques.",
+      "detection": {
+        "attack_type": "exfiltration",
+        "attacker_ips": [
+          "198.51.100.200"
+        ],
+        "victim_accounts": [
+          "backup_svc"
+        ],
+        "attack_start_time": "2026-02-01T10:00:00Z",
+        "attack_end_time": "2026-02-01T10:30:00Z",
+        "indicators": {
+          "bytes_estimate": 1200000,
+          "dest_regions": [
+            "unknown-cn"
+          ]
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.82,
+        "severity": 0.86,
+        "alert_summary": 0.87,
+        "remediation_proposal": 0.78,
+        "detection": {
+          "attack_type": 0.81,
+          "attacker_ips": [
+            0.8
+          ],
+          "victim_accounts": [
+            0.77
+          ],
+          "attack_start_time": 0.76,
+          "attack_end_time": 0.75,
+          "indicators": 0.72
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Aligné sur exfiltration (volume sortant anormal).",
+        "severity": "Justification niveau critical selon impact et surface (voir incidents agrégés).",
+        "alert_summary": "Résumé dérivé du type d’attaque, des acteurs et des indicateurs clés.",
+        "remediation_proposal": "Couper les flux sortants suspects, révoquer clés S3/API, forensic image disque et buckets, notifier CERT interne.",
+        "detection": {
+          "attack_type": "Transferts volumineux vers destinations atypiques pour le compte backup_svc.",
+          "attacker_ips": [
+            "Pair réseau associé au flux sortant dominant."
+          ],
+          "victim_accounts": [
+            "Compte service impliqué dans les opérations de transfert agrégées."
+          ],
+          "attack_start_time": "Début du pic de bytes sortants.",
+          "attack_end_time": "Fin du transfert consolidé sur la fenêtre.",
+          "indicators": "bytes_estimate et dest_regions résument l’ampleur et la géolocalisation approximative des destinations."
+        },
+        "detection_time_seconds": "Constante pipeline."
+      },
+      "exhaustive_analysis": "Récit — 10:00–10:30 UTC : le compte backup_svc associé à 198.51.100.200 présente un transfert sortant volumineux vers des régions atypiques. Scénario exfiltration possible : couper les flux, vérifier clés API et buckets, forensic sur la chaîne backup.",
+      "remediation_proposal": "1) Suspendre immédiatement les transferts et les credentials backup_svc. 2) Inspecter buckets et politiques IAM. 3) Bloquer destinations unknown-cn au pare-feu sortant. 4) Conserver preuves pour enquête ; restaurer depuis sauvegardes saines si compromission."
+    }
+  ]
+}

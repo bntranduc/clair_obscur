@@ -6,4 +6,4 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 export PYTHONPATH="$ROOT/src"
-exec uvicorn backend.model.serve_app:app --host "${HOST:-0.0.0.0}" --port "${PORT:-8080}"
+exec uvicorn api.model_app:app --host "${HOST:-0.0.0.0}" --port "${PORT:-8080}"
