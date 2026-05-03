@@ -1,12 +1,22 @@
 import type { NormalizedEvent } from "@/lib/normalizedLog";
 import type { SiemDashboard } from "@/types/siemAnalytics";
 
-const DEFAULT_API_URL = "http://127.0.0.1:8020";
+/** API FastAPI déployée (EC2). */
+const API_BASE_URL = "http://13.39.106.74:8020";
 
 function getApiUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL;
-  return raw.replace(/\/+$/, "");
+  return API_BASE_URL.replace(/\/+$/, "");
 }
+
+/** Champs optionnels alignés sur ``POST /api/v1/logs/normalized`` (rôle IAM sur le serveur si omis). */
+export type FetchNormalizedLogsOptions = {
+  raw_logs_bucket?: string;
+  raw_logs_prefix?: string;
+  region?: string;
+  aws_access_key_id?: string;
+  aws_secret_access_key?: string;
+  aws_session_token?: string;
+};
 
 export type NormalizedLogsPage = {
   items: NormalizedEvent[];
@@ -15,19 +25,36 @@ export type NormalizedLogsPage = {
   limit: number;
 };
 
-export async function fetchNormalizedLogs(params: {
-  skip?: number;
-  limit?: number;
-}): Promise<NormalizedLogsPage> {
-  const sp = new URLSearchParams();
-  if (params.skip !== undefined) sp.set("skip", String(params.skip));
-  if (params.limit !== undefined) sp.set("limit", String(params.limit));
-  const q = sp.toString();
-  const url = `${getApiUrl()}/api/v1/logs/normalized${q ? `?${q}` : ""}`;
-  const res = await fetch(url, { cache: "no-store" });
+export async function fetchNormalizedLogs(
+  params: { skip?: number; limit?: number },
+  options?: FetchNormalizedLogsOptions,
+): Promise<NormalizedLogsPage> {
+  const body: Record<string, string | number> = {
+    skip: params.skip ?? 0,
+    limit: params.limit ?? 50,
+  };
+  if (options?.raw_logs_bucket?.trim()) body.raw_logs_bucket = options.raw_logs_bucket.trim();
+  if (options?.raw_logs_prefix?.trim()) body.raw_logs_prefix = options.raw_logs_prefix.trim();
+  if (options?.region?.trim()) body.region = options.region.trim();
+  const ak = options?.aws_access_key_id?.trim();
+  const sk = options?.aws_secret_access_key?.trim();
+  const st = options?.aws_session_token?.trim();
+  if (ak && sk) {
+    body.aws_access_key_id = ak;
+    body.aws_secret_access_key = sk;
+    if (st) body.aws_session_token = st;
+  }
+
+  const url = `${getApiUrl()}/api/v1/logs/normalized`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`GET /api/v1/logs/normalized failed (${res.status}) ${text}`.trim());
+    throw new Error(`POST /api/v1/logs/normalized failed (${res.status}) ${text}`.trim());
   }
   return (await res.json()) as NormalizedLogsPage;
 }
@@ -46,14 +73,32 @@ export type ChatApiMessage = { role: "user" | "assistant"; content: string };
 
 export type ChatApiResponse = { reply: string };
 
-/** Assistant IA (Bedrock) — même route sur ``api.main`` (8020) et ``api.model_app`` (8080). */
-export async function postChat(messages: ChatApiMessage[]): Promise<ChatApiResponse> {
+export type PostChatOptions = {
+  region?: string;
+  aws_access_key_id?: string;
+  aws_secret_access_key?: string;
+  aws_session_token?: string;
+};
+
+/** Assistant IA (Bedrock) — ``POST /api/v1/chat`` sur l’API EC2. Identifiants optionnels (déconseillé côté navigateur). */
+export async function postChat(messages: ChatApiMessage[], options?: PostChatOptions): Promise<ChatApiResponse> {
   const url = `${getApiUrl()}/api/v1/chat`;
   const trimmed = messages.slice(-24);
+  const payload: Record<string, unknown> = { messages: trimmed };
+  if (options?.region?.trim()) payload.region = options.region.trim();
+  const ak = options?.aws_access_key_id?.trim();
+  const sk = options?.aws_secret_access_key?.trim();
+  const st = options?.aws_session_token?.trim();
+  if (ak && sk) {
+    payload.aws_access_key_id = ak;
+    payload.aws_secret_access_key = sk;
+    if (st) payload.aws_session_token = st;
+  }
+
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages: trimmed }),
+    body: JSON.stringify(payload),
     cache: "no-store",
   });
   if (!res.ok) {

@@ -3,8 +3,8 @@
 - **Avec** ``aws_credentials`` dans le corps : Bedrock avec ces identifiants pour cette requête.
 - **Sans** : Bedrock via ``AWS_PROFILE`` / rôle instance / variables d’environnement AWS.
 
-Expose aussi ``/api/v1/analytics/siem`` (même contrat que ``api.main``) pour que le
-dashboard fonctionne lorsque ``NEXT_PUBLIC_API_URL`` pointe vers cette instance (ex. port 8080).
+Expose aussi ``/api/v1/analytics/siem`` (même contrat que ``api.main``) pour un déploiement
+où le front cible cette instance (ex. port 8080) au lieu de ``api.main``.
 """
 
 from __future__ import annotations
