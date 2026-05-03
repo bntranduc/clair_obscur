@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Build / exécution Docker de l’API ``api.main`` (port conteneur 8020).
 #
+# Prod (dashboard logs S3) : attacher un **rôle IAM** à l’instance EC2 avec ``s3:GetObject`` / ``s3:ListBucket``
+# sur ``RAW_LOGS_BUCKET`` / préfixe, et hop limit IMDS ≥ 2 pour que le conteneur reçoive les creds du rôle.
+# Sinon : définir ``AWS_ACCESS_KEY_ID`` / ``AWS_SECRET_ACCESS_KEY`` (et optionnellement ``AWS_SESSION_TOKEN``)
+# dans le ``.env`` passé à ``docker run`` (voir ``_env_args``).
+#
 # Usage (depuis n’importe où ; la racine du dépôt est déduite) :
 #   bash src/api/docker_backend.sh build
 #   bash src/api/docker_backend.sh run              # premier plan, --rm
