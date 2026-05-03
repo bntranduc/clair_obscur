@@ -90,23 +90,37 @@ _PRIV_ESC_CMD_RE = re.compile(
 )
 
 SSRF_PARAM_RE = re.compile(
-    r'(?:url|callback|target|proxy|redirect|fetch|dest(?:ination)?|uri|src|path|resource|endpoint|load|request)\s*=\s*(https?://[^\s&"\']+)',
+    r'(?:url|callback|target|proxy|redirect|fetch|dest(?:ination)?|uri|src|path|resource|endpoint|load|request)\s*=\s*'
+    r'((?:https?|file|gopher|dict|ldap|ftp|php|jar)://[^\s&"\']+)',
     re.I,
 )
 
+# Aucun scheme non-HTTP n'a d'usage légitime sur un endpoint web fetch
+SSRF_DANGEROUS_SCHEME_RE = re.compile(r'^(?:file|gopher|dict|ldap|ftp|php|jar)://', re.I)
+
 SSRF_INTERNAL_RE = re.compile(
-    r'^(?:10\.|172\.(?:1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.)',
+    r'^(?:10\.|172\.(?:1[6-9]|2\d|3[01])\.|192\.168\.|127\.|169\.254\.|0\.0\.0\.0|localhost|\[::1\]|::1)',
+    re.I,
 )
 
 TRAVERSAL_RE = re.compile(
-    r"(\.\./|\.\.\\|%2e%2e|%252e%252e|\.\.%2f|\.\.%5c|\.\.%252f|%2e%2e%2f|%2e%2e/|\.\./)",
+    r"(\.\./|\.\.\\|"
+    r"%2e%2e[%2f5c/\\]|%252e%252e[%2f5c/\\]?|"
+    r"\.\.%2f|\.\.%5c|\.\.%252f|"
+    r"%2e%2e%2f|%2e%2e/|"
+    r"%c0%ae%c0%ae[%2f5c/\\]?|"  # overlong UTF-8 encoding of ../
+    r"\.\.\.\.//|\.\.\.\.\\\\|\.\.\.\/\\)",  # ....// ....\ ..../\
     re.I,
 )
 
 SENSITIVE_PATH_RE = re.compile(
-    r"(/etc/passwd|/etc/shadow|/etc/sudoers|\.ssh/|id_rsa|\.htpasswd|/proc/self|/root/|/var/log/auth|/etc/hosts)",
+    r"(/etc/|\.ssh/|id_rsa|\.htpasswd|/proc/self|/root/|/var/log/|"
+    r"[Cc][:/\\]Windows|\.bash_history|web\.config|boot\.ini)",
     re.I,
 )
+
+# UA caractéristique de l'outil d'automatisation utilisé pour le path traversal
+TRAVERSAL_UA_RE = re.compile(r"python-requests/", re.I)
 
 SQLI_REGEXES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"union\s+(all\s+)?select",                   re.I), "UNION SELECT"),
@@ -219,6 +233,7 @@ def detect_signals_window_1h(
     # --- Directory traversal hits grouped by (source_ip, hostname) ---
     traversal_hits: dict[tuple[str, str], list[tuple[str, str, int | None]]] = defaultdict(list)  # (ts, uri, status_code)
     traversal_success_hits: dict[tuple[str, str], list[tuple[str, str]]] = defaultdict(list)  # (ts, uri) for status=200 + sensitive
+    traversal_ua_hits: dict[tuple[str, str], int] = defaultdict(int)  # python-requests UA hits
 
     # --- SQLi hits grouped by (source_ip, hostname) ---
     sqli_hits: dict[tuple[str, str], list[tuple[str, str, str]]] = defaultdict(list)  # (ts, uri, reason)
@@ -294,22 +309,30 @@ def detect_signals_window_1h(
             host = e.get("hostname") or ""
             ua = e.get("user_agent") or ""
             decoded_uri = _safe_unquote(uri)
-            # SSRF detection — parameter containing internal IP or cloud metadata URL
+            # SSRF detection
             for m in SSRF_PARAM_RE.finditer(uri + " " + decoded_uri):
                 target_url = m.group(1)
-                # extract host from URL
+                # Scheme dangereux non-HTTP : toujours suspect, pas besoin de vérifier le host
+                if SSRF_DANGEROUS_SCHEME_RE.match(target_url):
+                    ssrf_hits[(src, host)].append((ts, uri, target_url))
+                    break
+                # HTTP(S) : vérifier si le host est interne/loopback/metadata
                 host_m = re.match(r'https?://([^/\s?#:]+)', target_url)
-                if host_m:
-                    target_host = host_m.group(1)
-                    if SSRF_INTERNAL_RE.match(target_host) or "169.254" in target_host:
-                        ssrf_hits[(src, host)].append((ts, uri, target_url))
-                        break  # one match per event is enough
+                if host_m and SSRF_INTERNAL_RE.match(host_m.group(1)):
+                    ssrf_hits[(src, host)].append((ts, uri, target_url))
+                    break
 
             # Directory traversal detection
-            if TRAVERSAL_RE.search(uri) or TRAVERSAL_RE.search(decoded_uri):
+            is_traversal_pattern = bool(TRAVERSAL_RE.search(uri) or TRAVERSAL_RE.search(decoded_uri))
+            is_traversal_ua = bool(TRAVERSAL_UA_RE.search(ua))
+            is_sensitive = bool(SENSITIVE_PATH_RE.search(decoded_uri) or SENSITIVE_PATH_RE.search(uri))
+            # Fire on explicit traversal pattern OR python-requests UA + sensitive path (automated LFI tool)
+            if is_traversal_pattern or (is_traversal_ua and is_sensitive):
                 sc = e.get("status_code")
                 traversal_hits[(src, host)].append((ts, uri, sc))
-                if sc == 200 and (SENSITIVE_PATH_RE.search(decoded_uri) or SENSITIVE_PATH_RE.search(uri)):
+                if is_traversal_ua:
+                    traversal_ua_hits[(src, host)] += 1
+                if sc == 200 and is_sensitive:
                     traversal_success_hits[(src, host)].append((ts, uri))
             sqli_reason = _sqli_match_reason(uri, ua)
             if sqli_reason:
@@ -662,14 +685,40 @@ def detect_signals_window_1h(
         sig_ts = hits_sorted[0][0]
         sig_ts_end = hits_sorted[-1][0]
         targets = list({t for _, _, t in hits_sorted})
-        # extract distinct target hosts
+        # extract distinct target hosts and categorize
         target_hosts: list[str] = []
+        dangerous_schemes: list[str] = []
+        metadata_hits = 0
+        loopback_hits = 0
         seen: set[str] = set()
         for t in targets:
-            hm = re.match(r'https?://([^/\s?#]+)', t)
-            if hm and hm.group(1) not in seen:
-                seen.add(hm.group(1))
-                target_hosts.append(hm.group(1))
+            if SSRF_DANGEROUS_SCHEME_RE.match(t):
+                scheme = t.split("://")[0].lower()
+                if scheme not in dangerous_schemes:
+                    dangerous_schemes.append(scheme)
+                continue
+            hm = re.match(r'https?://([^/\s?#:]+)', t)
+            if hm:
+                h = hm.group(1)
+                if h not in seen:
+                    seen.add(h)
+                    target_hosts.append(h)
+                if "169.254" in h:
+                    metadata_hits += sum(1 for _, _, tt in hits_sorted if "169.254" in tt)
+                if re.match(r'^(?:127\.|localhost|0\.0\.0\.0|\[::1\]|::1)', h, re.I):
+                    loopback_hits += sum(1 for _, _, tt in hits_sorted if h in tt)
+        iocs: dict = {
+            "hits": int(len(hits_sorted)),
+            "ssrf_targets": target_hosts[:10],
+            "sample_uris": [u for _, u, _ in hits_sorted[:5]],
+            "window_seconds": WINDOW_SECONDS,
+        }
+        if dangerous_schemes:
+            iocs["dangerous_schemes"] = dangerous_schemes
+        if metadata_hits:
+            iocs["cloud_metadata_hits"] = int(metadata_hits)
+        if loopback_hits:
+            iocs["loopback_hits"] = int(loopback_hits)
         signals.append(
             {
                 "rule_id": "SSRF",
@@ -677,12 +726,7 @@ def detect_signals_window_1h(
                 "ts_end": sig_ts_end,
                 "source_ip": ip,
                 "hostname": host,
-                "iocs": {
-                    "hits": int(len(hits_sorted)),
-                    "ssrf_targets": target_hosts[:10],
-                    "sample_uris": [u for _, u, _ in hits_sorted[:5]],
-                    "window_seconds": WINDOW_SECONDS,
-                },
+                "iocs": iocs,
             }
         )
 
@@ -696,6 +740,7 @@ def detect_signals_window_1h(
         status_counts: Counter[int | None] = Counter(sc for _, _, sc in hits_sorted)
         success_hits = status_counts.get(200, 0)
         sample_uris = [u for _, u, _ in hits_sorted[:5]]
+        ua_hits = traversal_ua_hits.get((ip, host), 0)
         sig = {
             "rule_id": "DIRECTORY_TRAVERSAL",
             "ts": sig_ts,
@@ -708,6 +753,7 @@ def detect_signals_window_1h(
                 "status_counts": {str(k): v for k, v in status_counts.most_common()},
                 "sample_uris": sample_uris,
                 "window_seconds": WINDOW_SECONDS,
+                **({"python_requests_ua_hits": int(ua_hits)} if ua_hits else {}),
             },
         }
         # attach sensitive file reads if any
@@ -736,6 +782,7 @@ def detect_signals_window_1h(
                     "successful_reads": int(len(hits_sorted)),
                     "sensitive_files": sensitive_files,
                     "window_seconds": WINDOW_SECONDS,
+                    **({"python_requests_ua_hits": int(traversal_ua_hits.get((ip, host), 0))} if traversal_ua_hits.get((ip, host)) else {}),
                 },
             }
         )
