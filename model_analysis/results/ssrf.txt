@@ -1,0 +1,117 @@
+[1/4] Chargement de datasets/opensearch_range_logs_ssrf_plus2h.json ...
+      266988 événements normalisés en 1.79s
+
+[2/4] Détection des signaux (fenêtre 1h) ...
+      1 signal(s) détecté(s) en 1.64s
+
+--- Signaux détectés ---
+  rule=SSRF  ip=203.0.113.100  user=None  ts=2026-01-26T11:00:00.281Z
+
+[3/4] Agrégation des signaux ...
+      1 incident(s) agrégé(s)
+
+--- Incidents agrégés ---
+[
+  {
+    "rule_id": "SSRF",
+    "source_ip": "203.0.113.100",
+    "username": "",
+    "hostname": "web-prod-01",
+    "start_time": "2026-01-26T11:00:00.281000Z",
+    "end_time": "2026-01-26T12:13:30.411000Z",
+    "indicators": {
+      "hits": 300,
+      "window_seconds": 900,
+      "top_kv": {
+        "ssrf_targets=['10.0.4.10:389', '10.0.2.10:8080', '10.0.3.10:5432', '10.0.3.10:3306', '169.254.169.254']": 1,
+        "sample_uris=['/api/v1/fetch?url=http://10.0.4.10:389/', '/api/v1/fetch?url=http://169.254.169.254/latest/meta-data/', '/api/v1/fetch?url=http://10.0.3.10:5432/', '/api/v1/proxy?target=http://10.0.2.10:8080/admin', '/api/v1/webhook?callback=http://10.0.3.10:3306/']": 1
+      }
+    },
+    "evidence_ids": []
+  }
+]
+
+[4/4] Envoi au LLM (eu.anthropic.claude-opus-4-6-v1, region=eu-west-3) ...
+      Réponse reçue en 4.10s
+
+--- Résultat LLM (brut) ---
+[
+  {
+    "challenge_id": "ssrf",
+    "detection": {
+      "attack_type": "ssrf",
+      "attacker_ips": [
+        "203.0.113.100"
+      ],
+      "victim_accounts": [],
+      "attack_start_time": "2026-01-26T11:00:00.281000Z",
+      "attack_end_time": "2026-01-26T12:13:30.411000Z",
+      "indicators": {
+        "rule_ids": [
+          "SSRF"
+        ],
+        "hits": 300,
+        "window_seconds": 900,
+        "hostname": "web-prod-01",
+        "ssrf_targets": [
+          "10.0.4.10:389",
+          "10.0.2.10:8080",
+          "10.0.3.10:5432",
+          "10.0.3.10:3306",
+          "169.254.169.254"
+        ],
+        "sample_uris": [
+          "/api/v1/fetch?url=http://10.0.4.10:389/",
+          "/api/v1/fetch?url=http://169.254.169.254/latest/meta-data/",
+          "/api/v1/fetch?url=http://10.0.3.10:5432/",
+          "/api/v1/proxy?target=http://10.0.2.10:8080/admin",
+          "/api/v1/webhook?callback=http://10.0.3.10:3306/"
+        ]
+      }
+    },
+    "detection_time_seconds": 300
+  }
+]
+
+--- Alertes format ground-truth ---
+[
+  {
+    "_index": "ground-truth-ds1",
+    "_id": "ssrf",
+    "_source": {
+      "dataset": 1,
+      "challenge_id": "ssrf",
+      "attack_type": "ssrf",
+      "attacker_ips": [
+        "203.0.113.100"
+      ],
+      "victim_accounts": [],
+      "attack_window": {
+        "start": "2026-01-26T11:00:00.281000Z",
+        "end": "2026-01-26T12:13:30.411000Z"
+      },
+      "indicators": {
+        "rule_ids": [
+          "SSRF"
+        ],
+        "hits": 300,
+        "window_seconds": 900,
+        "hostname": "web-prod-01",
+        "ssrf_targets": [
+          "10.0.4.10:389",
+          "10.0.2.10:8080",
+          "10.0.3.10:5432",
+          "10.0.3.10:3306",
+          "169.254.169.254"
+        ],
+        "sample_uris": [
+          "/api/v1/fetch?url=http://10.0.4.10:389/",
+          "/api/v1/fetch?url=http://169.254.169.254/latest/meta-data/",
+          "/api/v1/fetch?url=http://10.0.3.10:5432/",
+          "/api/v1/proxy?target=http://10.0.2.10:8080/admin",
+          "/api/v1/webhook?callback=http://10.0.3.10:3306/"
+        ]
+      }
+    }
+  }
+]

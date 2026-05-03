@@ -1,0 +1,148 @@
+[1/4] Chargement de datasets/opensearch_range_logs_directory_traversal_plus2h.json ...
+      320372 événements normalisés en 2.13s
+
+[2/4] Détection des signaux (fenêtre 1h) ...
+      2 signal(s) détecté(s) en 1.95s
+
+--- Signaux détectés ---
+  rule=DIRECTORY_TRAVERSAL  ip=198.51.100.200  user=None  ts=2026-01-23T10:00:00.156Z
+  rule=DIRECTORY_TRAVERSAL_SUCCESS  ip=198.51.100.200  user=None  ts=2026-01-23T10:03:09.438Z
+
+[3/4] Agrégation des signaux ...
+      2 incident(s) agrégé(s)
+
+--- Incidents agrégés ---
+[
+  {
+    "rule_id": "DIRECTORY_TRAVERSAL",
+    "source_ip": "198.51.100.200",
+    "username": "",
+    "hostname": "web-prod-01",
+    "start_time": "2026-01-23T10:00:00.156000Z",
+    "end_time": "2026-01-23T11:23:00.467000Z",
+    "indicators": {
+      "hits": 250,
+      "successful_reads": 77,
+      "window_seconds": 900,
+      "top_kv": {
+        "status_counts={'403': 81, '200': 77, '404': 63, '500': 29}": 1,
+        "sample_uris=['/api/v1/files?path=../../../home/admin/.bash_history', '/static/....//....//....//etc/shadow', '/api/v1/files?path=../../../etc/passwd', '/static/....//....//....//etc/shadow', '/api/v1/files?path=../../../etc/passwd']": 1,
+        "sensitive_files=['/api/v1/files?path=../../../etc/passwd', '/static/....//....//....//etc/shadow', '/api/v1/download?file=....//....//....//etc/passwd', '/api/v1/files?path=../../../etc/shadow', '/api/v1/files?path=../../../etc/hosts', '/api/v1/files?path=../../../root/.ssh/id_rsa']": 1
+      }
+    },
+    "evidence_ids": []
+  },
+  {
+    "rule_id": "DIRECTORY_TRAVERSAL_SUCCESS",
+    "source_ip": "198.51.100.200",
+    "username": "",
+    "hostname": "web-prod-01",
+    "start_time": "2026-01-23T10:03:09.438000Z",
+    "end_time": "2026-01-23T11:23:00.467000Z",
+    "indicators": {
+      "successful_reads": 74,
+      "window_seconds": 900,
+      "top_kv": {
+        "sensitive_files=['/api/v1/files?path=../../../etc/passwd', '/static/....//....//....//etc/shadow', '/api/v1/download?file=....//....//....//etc/passwd', '/api/v1/files?path=../../../etc/shadow', '/api/v1/files?path=../../../etc/hosts', '/api/v1/files?path=../../../root/.ssh/id_rsa']": 1
+      }
+    },
+    "evidence_ids": []
+  }
+]
+
+[4/4] Envoi au LLM (eu.anthropic.claude-opus-4-6-v1, region=eu-west-3) ...
+      Réponse reçue en 4.38s
+
+--- Résultat LLM (brut) ---
+[
+  {
+    "challenge_id": "directory_traversal",
+    "detection": {
+      "attack_type": "directory_traversal",
+      "attacker_ips": [
+        "198.51.100.200"
+      ],
+      "victim_accounts": [],
+      "attack_start_time": "2026-01-23T10:00:00.156000Z",
+      "attack_end_time": "2026-01-23T11:23:00.467000Z",
+      "indicators": {
+        "rule_ids": [
+          "DIRECTORY_TRAVERSAL",
+          "DIRECTORY_TRAVERSAL_SUCCESS"
+        ],
+        "hostname": "web-prod-01",
+        "total_hits": 250,
+        "successful_reads": 77,
+        "status_counts": {
+          "403": 81,
+          "200": 77,
+          "404": 63,
+          "500": 29
+        },
+        "sensitive_files_accessed": [
+          "/api/v1/files?path=../../../etc/passwd",
+          "/static/....//....//....//etc/shadow",
+          "/api/v1/download?file=....//....//....//etc/passwd",
+          "/api/v1/files?path=../../../etc/shadow",
+          "/api/v1/files?path=../../../etc/hosts",
+          "/api/v1/files?path=../../../root/.ssh/id_rsa"
+        ],
+        "sample_uris": [
+          "/api/v1/files?path=../../../home/admin/.bash_history",
+          "/static/....//....//....//etc/shadow",
+          "/api/v1/files?path=../../../etc/passwd"
+        ]
+      }
+    },
+    "detection_time_seconds": 300
+  }
+]
+
+--- Alertes format ground-truth ---
+[
+  {
+    "_index": "ground-truth-ds1",
+    "_id": "directory_traversal",
+    "_source": {
+      "dataset": 1,
+      "challenge_id": "directory_traversal",
+      "attack_type": "directory_traversal",
+      "attacker_ips": [
+        "198.51.100.200"
+      ],
+      "victim_accounts": [],
+      "attack_window": {
+        "start": "2026-01-23T10:00:00.156000Z",
+        "end": "2026-01-23T11:23:00.467000Z"
+      },
+      "indicators": {
+        "rule_ids": [
+          "DIRECTORY_TRAVERSAL",
+          "DIRECTORY_TRAVERSAL_SUCCESS"
+        ],
+        "hostname": "web-prod-01",
+        "total_hits": 250,
+        "successful_reads": 77,
+        "status_counts": {
+          "403": 81,
+          "200": 77,
+          "404": 63,
+          "500": 29
+        },
+        "sensitive_files_accessed": [
+          "/api/v1/files?path=../../../etc/passwd",
+          "/static/....//....//....//etc/shadow",
+          "/api/v1/download?file=....//....//....//etc/passwd",
+          "/api/v1/files?path=../../../etc/shadow",
+          "/api/v1/files?path=../../../etc/hosts",
+          "/api/v1/files?path=../../../root/.ssh/id_rsa"
+        ],
+        "sample_uris": [
+          "/api/v1/files?path=../../../home/admin/.bash_history",
+          "/static/....//....//....//etc/shadow",
+          "/api/v1/files?path=../../../etc/passwd"
+        ]
+      }
+    }
+  }
+]

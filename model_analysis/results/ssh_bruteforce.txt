@@ -1,0 +1,281 @@
+[1/4] Chargement de datasets/opensearch_range_logs_ssh_bruteforce_plus2h.json ...
+      297338 événements normalisés en 1.71s
+
+[2/4] Détection des signaux (fenêtre 1h) ...
+      9 signal(s) détecté(s) en 1.73s
+
+--- Signaux détectés ---
+  rule=SSH_BRUTEFORCE  ip=198.51.100.89  user=None  ts=2026-01-11T01:00:00.364000Z
+  rule=SSH_BRUTEFORCE  ip=45.33.32.156  user=None  ts=2026-01-11T01:00:01.216000Z
+  rule=SSH_PRIV_ESC  ip=None  user=sysadmin  ts=2026-01-11T03:03:00.323Z
+  rule=SSH_LATERAL_MOVE  ip=None  user=None  ts=2026-01-11T04:09:05.511Z
+  rule=SSH_EXFIL  ip=45.33.32.156  user=None  ts=2026-01-11T06:00:00.843Z
+  rule=SSH_BRUTEFORCE_SSH_ONLY  ip=198.51.100.89  user=None  ts=2026-01-11T01:00:00.364Z
+  rule=SSH_BRUTEFORCE_SSH_ONLY  ip=45.33.32.156  user=None  ts=2026-01-11T01:00:01.216Z
+  rule=SUSPICIOUS_GEO  ip=198.51.100.89  user=None  ts=2026-01-11T01:00:00.364Z
+  rule=SUSPICIOUS_GEO  ip=45.33.32.156  user=None  ts=2026-01-11T01:00:01.216Z
+
+[3/4] Agrégation des signaux ...
+      9 incident(s) agrégé(s)
+
+--- Incidents agrégés ---
+[
+  {
+    "rule_id": "SSH_BRUTEFORCE",
+    "source_ip": "198.51.100.89",
+    "username": "",
+    "hostname": "",
+    "start_time": "2026-01-11T01:00:00.364000Z",
+    "end_time": "2026-01-11T02:57:42.535000Z",
+    "indicators": {
+      "ssh_failures": 1836,
+      "window_seconds": 900,
+      "burst_n": 5,
+      "burst_seconds": 10
+    },
+    "evidence_ids": []
+  },
+  {
+    "rule_id": "SSH_BRUTEFORCE",
+    "source_ip": "45.33.32.156",
+    "username": "",
+    "hostname": "",
+    "start_time": "2026-01-11T01:00:01.216000Z",
+    "end_time": "2026-01-11T02:57:36.098000Z",
+    "indicators": {
+      "ssh_failures": 2814,
+      "window_seconds": 900,
+      "burst_n": 5,
+      "burst_seconds": 10
+    },
+    "evidence_ids": []
+  },
+  {
+    "rule_id": "SSH_PRIV_ESC",
+    "source_ip": "",
+    "username": "sysadmin",
+    "hostname": "",
+    "start_time": "2026-01-11T03:03:00.323000Z",
+    "end_time": "2026-01-11T03:41:00.105000Z",
+    "indicators": {
+      "window_seconds": 900,
+      "top_kv": {
+        "commands=['sudo -l', 'sudo -i', 'cat /etc/shadow', 'cat /etc/sudoers', 'useradd -m -s /bin/bash backdoor', \"echo 'backdoor ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers\", 'history -c']": 1
+      }
+    },
+    "evidence_ids": []
+  },
+  {
+    "rule_id": "SSH_LATERAL_MOVE",
+    "source_ip": "",
+    "username": "",
+    "hostname": "",
+    "start_time": "2026-01-11T04:09:05.511000Z",
+    "end_time": "2026-01-11T05:17:05.970000Z",
+    "indicators": {
+      "hits": 4,
+      "window_seconds": 900,
+      "top_kv": {
+        "lateral_targets=['app-prod-02', 'web-prod-01', 'web-prod-02', 'app-prod-01']": 1,
+        "pivot_ips=['10.0.5.10']": 1
+      }
+    },
+    "evidence_ids": []
+  },
+  {
+    "rule_id": "SSH_EXFIL",
+    "source_ip": "45.33.32.156",
+    "username": "",
+    "hostname": "",
+    "start_time": "2026-01-11T06:00:00.843000Z",
+    "end_time": "2026-01-11T06:16:30.233000Z",
+    "indicators": {
+      "exfil_bytes": 72825484,
+      "exfil_mb": 69.45,
+      "window_seconds": 900,
+      "top_kv": {
+        "internal_sources=['10.0.3.10']": 1
+      }
+    },
+    "evidence_ids": []
+  },
+  {
+    "rule_id": "SSH_BRUTEFORCE_SSH_ONLY",
+    "source_ip": "198.51.100.89",
+    "username": "",
+    "hostname": "",
+    "start_time": "2026-01-11T01:00:00.364000Z",
+    "end_time": "2026-01-11T02:57:42.535000Z",
+    "indicators": {
+      "window_seconds": 900,
+      "top_kv": {
+        "auth_methods={'ssh': 1836}": 1
+      }
+    },
+    "evidence_ids": []
+  },
+  {
+    "rule_id": "SSH_BRUTEFORCE_SSH_ONLY",
+    "source_ip": "45.33.32.156",
+    "username": "",
+    "hostname": "",
+    "start_time": "2026-01-11T01:00:01.216000Z",
+    "end_time": "2026-01-11T02:57:36.098000Z",
+    "indicators": {
+      "window_seconds": 900,
+      "top_kv": {
+        "auth_methods={'ssh': 2814}": 1
+      }
+    },
+    "evidence_ids": []
+  },
+  {
+    "rule_id": "SUSPICIOUS_GEO",
+    "source_ip": "198.51.100.89",
+    "username": "",
+    "hostname": "",
+    "start_time": "2026-01-11T01:00:00.364000Z",
+    "end_time": "2026-01-11T02:57:42.535000Z",
+    "indicators": {
+      "window_seconds": 900,
+      "top_kv": {
+        "geo_counts={'RU': 1836}": 1,
+        "suspicious_countries=['RU', 'KP', 'CN']": 1,
+        "baseline=['FR']": 1
+      }
+    },
+    "evidence_ids": []
+  },
+  {
+    "rule_id": "SUSPICIOUS_GEO",
+    "source_ip": "45.33.32.156",
+    "username": "",
+    "hostname": "",
+    "start_time": "2026-01-11T01:00:01.216000Z",
+    "end_time": "2026-01-11T02:57:36.098000Z",
+    "indicators": {
+      "window_seconds": 900,
+      "top_kv": {
+        "geo_counts={'RU': 2814}": 1,
+        "suspicious_countries=['RU', 'KP', 'CN']": 1,
+        "baseline=['FR']": 1
+      }
+    },
+    "evidence_ids": []
+  }
+]
+
+[4/4] Envoi au LLM (eu.anthropic.claude-opus-4-6-v1, region=eu-west-3) ...
+      Réponse reçue en 5.00s
+
+--- Résultat LLM (brut) ---
+[
+  {
+    "challenge_id": "ssh_brute_force",
+    "detection": {
+      "attack_type": "ssh_brute_force",
+      "attacker_ips": [
+        "198.51.100.89",
+        "45.33.32.156"
+      ],
+      "victim_accounts": [
+        "sysadmin"
+      ],
+      "attack_start_time": "2026-01-11T01:00:00.364000Z",
+      "attack_end_time": "2026-01-11T06:16:30.233000Z",
+      "indicators": {
+        "rule_ids": [
+          "SSH_BRUTEFORCE",
+          "SSH_BRUTEFORCE_SSH_ONLY",
+          "SUSPICIOUS_GEO",
+          "SSH_PRIV_ESC",
+          "SSH_LATERAL_MOVE",
+          "SSH_EXFIL"
+        ],
+        "total_ssh_failures": 4650,
+        "attacker_geo": "RU",
+        "baseline_geo": "FR",
+        "priv_esc_commands": [
+          "sudo -l",
+          "sudo -i",
+          "cat /etc/shadow",
+          "cat /etc/sudoers",
+          "useradd -m -s /bin/bash backdoor",
+          "echo 'backdoor ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers",
+          "history -c"
+        ],
+        "lateral_targets": [
+          "app-prod-02",
+          "web-prod-01",
+          "web-prod-02",
+          "app-prod-01"
+        ],
+        "pivot_ips": [
+          "10.0.5.10"
+        ],
+        "exfil_mb": 69.45,
+        "exfil_destination_ip": "45.33.32.156",
+        "internal_exfil_source": "10.0.3.10"
+      }
+    },
+    "detection_time_seconds": 300
+  }
+]
+
+--- Alertes format ground-truth ---
+[
+  {
+    "_index": "ground-truth-ds1",
+    "_id": "ssh_brute_force",
+    "_source": {
+      "dataset": 1,
+      "challenge_id": "ssh_brute_force",
+      "attack_type": "ssh_brute_force",
+      "attacker_ips": [
+        "198.51.100.89",
+        "45.33.32.156"
+      ],
+      "victim_accounts": [
+        "sysadmin"
+      ],
+      "attack_window": {
+        "start": "2026-01-11T01:00:00.364000Z",
+        "end": "2026-01-11T06:16:30.233000Z"
+      },
+      "indicators": {
+        "rule_ids": [
+          "SSH_BRUTEFORCE",
+          "SSH_BRUTEFORCE_SSH_ONLY",
+          "SUSPICIOUS_GEO",
+          "SSH_PRIV_ESC",
+          "SSH_LATERAL_MOVE",
+          "SSH_EXFIL"
+        ],
+        "total_ssh_failures": 4650,
+        "attacker_geo": "RU",
+        "baseline_geo": "FR",
+        "priv_esc_commands": [
+          "sudo -l",
+          "sudo -i",
+          "cat /etc/shadow",
+          "cat /etc/sudoers",
+          "useradd -m -s /bin/bash backdoor",
+          "echo 'backdoor ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers",
+          "history -c"
+        ],
+        "lateral_targets": [
+          "app-prod-02",
+          "web-prod-01",
+          "web-prod-02",
+          "app-prod-01"
+        ],
+        "pivot_ips": [
+          "10.0.5.10"
+        ],
+        "exfil_mb": 69.45,
+        "exfil_destination_ip": "45.33.32.156",
+        "internal_exfil_source": "10.0.3.10"
+      }
+    }
+  }
+]
