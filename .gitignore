@@ -17,6 +17,16 @@ secrets/
 docker-compose.override.yml
 **/docker-compose.override.yml
 
+# --- AWS (build local, pas le code source) ---
+.aws-sam/
+cdk.out/
+.terraform/
+*.tfstate
+*.tfstate.*
+__MACOSX/
+# Zip de handler Lambda généré localement (ex. ``cd src/backend/lambda/raw_logs_to_predict && zip …``)
+src/backend/lambda/**/*.zip
+
 # --- Python ---
 __pycache__/
 *.py[cod]
