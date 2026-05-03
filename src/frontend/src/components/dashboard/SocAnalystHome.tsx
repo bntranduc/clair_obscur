@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  Activity,
   ArrowRight,
   Bot,
   ClipboardList,
@@ -12,7 +11,6 @@ import {
   Search,
   ShieldAlert,
   Sparkles,
-  Ticket,
   Zap,
 } from "lucide-react";
 import { fetchSiemAnalytics } from "@/lib/api";
@@ -58,20 +56,6 @@ const quickLinks: {
     hint: "Triage & fiches incidents modèle",
     icon: <ShieldAlert size={22} strokeWidth={1.75} />,
     accent: "from-rose-500/25 to-red-600/10 ring-rose-500/20",
-  },
-  {
-    href: "/dashboard/network",
-    label: "Carte réseau",
-    hint: "Vue topologique & flux",
-    icon: <Activity size={22} strokeWidth={1.75} />,
-    accent: "from-emerald-500/20 to-teal-600/10 ring-emerald-500/20",
-  },
-  {
-    href: "/dashboard/tickets",
-    label: "Tickets",
-    hint: "Suivi escalade & post-mortem",
-    icon: <Ticket size={22} strokeWidth={1.75} />,
-    accent: "from-amber-500/20 to-orange-600/10 ring-amber-500/20",
   },
   {
     href: "/dashboard/chat",

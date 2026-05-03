@@ -7,13 +7,10 @@ import {
   Home,
   LayoutDashboard,
   ShieldAlert,
-  Activity,
   Settings,
   Search,
   Bot,
   BookOpen,
-  Ticket,
-  Sparkles,
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
@@ -98,16 +95,10 @@ export default function DashboardLayout({
               icon={<LayoutDashboard size={18} strokeWidth={2} />}
               label="Analytics"
             />
-            <NavLink href="/dashboard/network" icon={<Activity size={18} strokeWidth={2} />} label="Carte réseau" />
-          </NavSection>
-
-          <NavSection title="Incidents">
-            <NavLink href="/dashboard/tickets" icon={<Ticket size={18} strokeWidth={2} />} label="Tickets" />
           </NavSection>
 
           <NavSection title="IA & docs">
             <NavLink href="/dashboard/chat" icon={<Bot size={18} strokeWidth={2} />} label="Assistant IA" />
-            <NavLink href="/dashboard/agentic" icon={<Sparkles size={18} strokeWidth={2} />} label="Agentic" />
             <NavLink href="/dashboard/wiki" icon={<BookOpen size={18} strokeWidth={2} />} label="Wiki" />
           </NavSection>
 
