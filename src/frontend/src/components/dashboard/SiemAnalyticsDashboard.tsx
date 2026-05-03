@@ -1,10 +1,12 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
 import {
   Activity,
   Database,
   Loader2,
+  MapPin,
   Network,
   Radio,
   RefreshCw,
@@ -27,7 +29,19 @@ import {
   YAxis,
 } from "recharts";
 import { fetchSiemAnalytics } from "@/lib/api";
-import type { SiemDashboard, SiemKeyCount } from "@/types/siemAnalytics";
+import type { SiemDashboard, SiemGeoLogPoint, SiemKeyCount } from "@/types/siemAnalytics";
+
+/** Référence stable pour « pas de points » (évite un nouveau [] à chaque rendu → boucle Leaflet). */
+const EMPTY_GEO_LOGS: SiemGeoLogPoint[] = [];
+
+const SiemGeoMap = dynamic(() => import("./SiemGeoMap").then((m) => m.default), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[380px] items-center justify-center rounded-lg border border-white/[0.08] bg-zinc-950/40 text-sm text-zinc-500">
+      Chargement de la carte…
+    </div>
+  ),
+});
 
 const PIE_COLORS = ["#3b82f6", "#ef4444", "#fbbf24", "#4ade80", "#f97316", "#94a3b8"];
 const TOOLTIP_STYLE = {
@@ -206,6 +220,8 @@ export default function SiemAnalyticsDashboard() {
   }
 
   if (!data) return null;
+
+  const geoLogs: SiemGeoLogPoint[] = data.geo_logs ?? EMPTY_GEO_LOGS;
 
   return (
     <div className="flex flex-col gap-8">
@@ -406,6 +422,28 @@ export default function SiemAnalyticsDashboard() {
           </div>
         </Panel>
       </div>
+
+      <Panel
+        title="Carte des logs géolocalisés"
+        subtitle={`${geoLogs.length.toLocaleString("fr-FR")} événement(s) avec geolocation_lat / geolocation_lon sur la fenêtre`}
+        className="min-h-[420px]"
+      >
+        <div className="mb-3 flex items-center gap-2 text-[12px] text-zinc-500">
+          <MapPin size={14} className="shrink-0 text-blue-400/90" aria-hidden />
+          <span>Fond OpenStreetMap — survol d’un point pour la source, l’IP et l’horodatage si présents.</span>
+        </div>
+        <div className="relative">
+          <SiemGeoMap points={geoLogs} />
+          {geoLogs.length === 0 ? (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-zinc-950/55 px-4">
+              <p className="max-w-md rounded-lg border border-white/10 bg-zinc-900/90 px-4 py-3 text-center text-sm text-zinc-300 shadow-lg">
+                Aucun log avec <code className="text-zinc-400">geolocation_lat</code> et{" "}
+                <code className="text-zinc-400">geolocation_lon</code> sur cette période — carte vide (vue monde).
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </Panel>
 
       <p className="flex items-center justify-center gap-2 text-center text-[11px] text-zinc-600">
         <Network size={12} aria-hidden />

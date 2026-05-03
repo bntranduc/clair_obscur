@@ -61,7 +61,8 @@ export async function fetchSiemAnalytics(hours: number = 24): Promise<SiemDashbo
     const text = await res.text().catch(() => "");
     throw new Error(`GET /api/v1/analytics/siem failed (${res.status}) ${text}`.trim());
   }
-  return (await res.json()) as SiemDashboard;
+  const j = (await res.json()) as SiemDashboard & { geo_logs?: SiemDashboard["geo_logs"] };
+  return { ...j, geo_logs: Array.isArray(j.geo_logs) ? j.geo_logs : [] };
 }
 
 export type ChatApiMessage = { role: "user" | "assistant"; content: string };

@@ -15,6 +15,7 @@ from backend.analytics.opensearch_client import build_client
 
 DEFAULT_INDEX = os.getenv("OPENSEARCH_INDEX", "logs-raw")
 TS_FIELD = os.getenv("OPENSEARCH_TIMESTAMP_FIELD", "timestamp")
+GEO_LOG_SAMPLE_SIZE = min(int(os.getenv("SIEM_GEO_SAMPLE_SIZE", "3000")), 10_000)
 
 
 def _terms_buckets(agg: dict[str, Any] | None, name: str) -> list[dict[str, Any]]:
@@ -71,6 +72,69 @@ def _search_body(*, hours: int, ts_field: str) -> dict[str, Any]:
     }
 
 
+def _parse_geo_hits(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Extrait lat/lon et métadonnées légères pour la carte (logs avec géolocalisation)."""
+    out: list[dict[str, Any]] = []
+    for h in hits:
+        src = h.get("_source") or {}
+        try:
+            lat = float(src.get("geolocation_lat"))
+            lon = float(src.get("geolocation_lon"))
+        except (TypeError, ValueError):
+            continue
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            continue
+        row: dict[str, Any] = {"lat": lat, "lon": lon}
+        ts = src.get("timestamp")
+        if ts is not None:
+            row["timestamp"] = ts
+        for k in ("source_ip", "log_source", "geolocation_country"):
+            v = src.get(k)
+            if v is not None and v != "":
+                row[k] = v
+        out.append(row)
+    return out
+
+
+def _fetch_geo_logs(
+    client: Any,
+    *,
+    index: str,
+    hours: int,
+    ts_field: str,
+    size: int,
+) -> list[dict[str, Any]]:
+    body: dict[str, Any] = {
+        "size": max(1, min(size, 10_000)),
+        "_source": {
+            "includes": [
+                "geolocation_lat",
+                "geolocation_lon",
+                "timestamp",
+                "source_ip",
+                "log_source",
+                "geolocation_country",
+            ]
+        },
+        "query": {
+            "bool": {
+                "must": [
+                    {"range": {ts_field: {"gte": f"now-{hours}h", "lte": "now"}}},
+                    {"exists": {"field": "geolocation_lat"}},
+                    {"exists": {"field": "geolocation_lon"}},
+                ]
+            }
+        },
+        "sort": [{ts_field: {"order": "desc"}}],
+    }
+    try:
+        resp = client.search(index=index, body=body)
+        raw_hits = resp.get("hits", {}).get("hits") or []
+        return _parse_geo_hits(raw_hits)
+    except Exception:
+        return []
+
+
 def _parse_response(body: dict[str, Any], *, hours: int) -> dict[str, Any]:
     total = int(body.get("hits", {}).get("total", {}).get("value", 0) or 0)
     aggs = body.get("aggregations") or {}
@@ -109,6 +173,7 @@ def _parse_response(body: dict[str, Any], *, hours: int) -> dict[str, Any]:
         "auth_by_status": auth_by_status,
         "top_source_ips": top_source_ips[:15],
         "system_by_severity": system_by_severity,
+        "geo_logs": [],
         "data_source": "opensearch",
     }
 
@@ -153,6 +218,13 @@ def _fallback_dashboard(*, hours: int) -> dict[str, Any]:
             {"key": "notice", "count": 2_100},
             {"key": "warning", "count": 800},
         ],
+        "geo_logs": [
+            {"lat": 52.3676, "lon": 4.9041, "log_source": "authentication", "source_ip": "198.51.100.10"},
+            {"lat": 48.8566, "lon": 2.3522, "log_source": "network", "source_ip": "185.220.101.1"},
+            {"lat": 50.1109, "lon": 8.6821, "log_source": "authentication", "source_ip": "10.0.0.2"},
+            {"lat": 45.7640, "lon": 4.8357, "log_source": "system", "source_ip": "192.168.1.1"},
+            {"lat": 40.7128, "lon": -74.0060, "log_source": "application", "source_ip": "203.0.113.5"},
+        ],
         "data_source": "demo",
     }
 
@@ -177,7 +249,10 @@ def get_siem_dashboard(
         client = build_client()
         body = _search_body(hours=h, ts_field=field)
         resp = client.search(index=idx, body=body)
-        return _parse_response(resp, hours=h)
+        out = _parse_response(resp, hours=h)
+        geo = _fetch_geo_logs(client, index=idx, hours=h, ts_field=field, size=GEO_LOG_SAMPLE_SIZE)
+        out["geo_logs"] = geo
+        return out
     except Exception:
         out = _fallback_dashboard(hours=h)
         return out
