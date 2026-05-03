@@ -26,6 +26,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -133,6 +134,13 @@ def _call_llm_with_retry(
     max_attempts: int = 6,
     base_delay: float = 10.0,
 ) -> Any:
+    creds: dict[str, str] = {}
+    if os.getenv("AWS_ACCESS_KEY_ID"):
+        creds["aws_access_key_id"] = os.getenv("AWS_ACCESS_KEY_ID")  # type: ignore[assignment]
+    if os.getenv("AWS_SECRET_ACCESS_KEY"):
+        creds["aws_secret_access_key"] = os.getenv("AWS_SECRET_ACCESS_KEY")  # type: ignore[assignment]
+    if os.getenv("AWS_SESSION_TOKEN"):
+        creds["aws_session_token"] = os.getenv("AWS_SESSION_TOKEN")  # type: ignore[assignment]
     for attempt in range(1, max_attempts + 1):
         try:
             return predict_submission_from_incidents(
@@ -141,9 +149,7 @@ def _call_llm_with_retry(
                 region=region,
                 model_id=model_id,
                 max_tokens=max_tokens,
-                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-                aws_session_token=os.getenv("AWS_SESSION_TOKEN"),
+                inline_aws_credentials=creds or None,
             )
         except Exception as e:
             if "ThrottlingException" not in type(e).__name__ and "ThrottlingException" not in str(e):
