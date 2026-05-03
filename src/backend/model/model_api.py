@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,14 +32,14 @@ app.add_middleware(
 
 
 class PredictRequest(BaseModel):
-    events: list[dict[str, Any]] = Field(..., min_length=1)
+    events: List[Dict[str, Any]] = Field(..., min_length=1)
     aws_access_key_id: str = Field(..., min_length=4)
     aws_secret_access_key: str = Field(..., min_length=4)
-    aws_session_token: str | None = Field(
+    aws_session_token: Optional[str] = Field(
         default=None,
         description="Jeton STS ; omis pour une paire clé secrète IAM classique.",
     )
-    region: str | None = Field(
+    region: Optional[str] = Field(
         default=None,
         description="Région Bedrock pour cet appel (sinon AWS_REGION / eu-west-3).",
     )
@@ -53,11 +53,11 @@ class PredictRequest(BaseModel):
 
 
 class PredictResponse(BaseModel):
-    alerts: list[dict[str, Any]]
+    alerts: List[Dict[str, Any]]
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
+def health() -> Dict[str, str]:
     return {"status": "ok"}
 
 
