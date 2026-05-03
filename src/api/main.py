@@ -74,30 +74,38 @@ def normalized_logs(
     Attention : les secrets apparaissent dans l’URL (logs serveur, historique). Préférer le rôle IAM quand possible.
     """
     try:
-        creds = _credentials_from_query(
-            AWS_ACCESS_KEY_ID,
-            AWS_SECRET_ACCESS_KEY,
-            AWS_SESSION_TOKEN,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    try:
-        items, has_more = fetch_normalized_page(
-            skip=skip,
-            limit=limit,
-            bucket=(raw_logs_bucket or "").strip() or None,
-            prefix=(raw_logs_prefix or "").strip() or None,
-            region=(region or "").strip() or None,
-            credentials=creds,
-        )
-    except (ClientError, BotoCoreError) as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
-    return {
-        "items": items,
-        "has_more": has_more,
-        "skip": skip,
-        "limit": limit,
-    }
+        try:
+            creds = _credentials_from_query(
+                AWS_ACCESS_KEY_ID,
+                AWS_SECRET_ACCESS_KEY,
+                AWS_SESSION_TOKEN,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        try:
+            items, has_more = fetch_normalized_page(
+                skip=skip,
+                limit=limit,
+                bucket=(raw_logs_bucket or "").strip() or None,
+                prefix=(raw_logs_prefix or "").strip() or None,
+                region=(region or "").strip() or None,
+                credentials=creds,
+            )
+        except (ClientError, BotoCoreError) as e:
+            raise HTTPException(status_code=502, detail=str(e)) from e
+        return {
+            "items": items,
+            "has_more": has_more,
+            "skip": skip,
+            "limit": limit,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"{type(e).__name__}: {e}",
+        ) from e
 
 
 @app.get(f"{API_V1}/analytics/siem")

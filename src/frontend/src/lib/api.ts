@@ -2,8 +2,15 @@ import type { NormalizedEvent } from "@/lib/normalizedLog";
 import type { SiemDashboard } from "@/types/siemAnalytics";
 import { getBackendBaseUrl } from "@/lib/apiBackendUrl";
 
+/**
+ * Par défaut : chaîne vide → ``fetch`` sur ``/api/v1/…`` (rewrites Next → API).
+ * Si ``NEXT_PUBLIC_SKIP_API_REWRITE=1`` : appel direct vers l’URL backend (CORS doit autoriser l’origine du front).
+ */
 function getApiUrl(): string {
-  return getBackendBaseUrl();
+  if (process.env.NEXT_PUBLIC_SKIP_API_REWRITE === "1") {
+    return getBackendBaseUrl();
+  }
+  return "";
 }
 
 /** Query optionnelle : pagination / bucket S3. Les creds AWS restent côté API (rôle IAM ou ``.env`` du conteneur). */
