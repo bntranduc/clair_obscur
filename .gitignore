@@ -116,3 +116,4 @@ datasets/**
 !datasets/fake_data/**
 
 archives/
+results/
