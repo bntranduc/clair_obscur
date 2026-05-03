@@ -21,6 +21,10 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(..., min_length=1, max_length=48)
+    aws_access_key_id: str | None = Field(default=None, description="Optionnel : Bedrock avec ces clés pour cet appel (sinon rôle / env).")
+    aws_secret_access_key: str | None = Field(default=None, repr=False)
+    aws_session_token: str | None = Field(default=None, repr=False)
+    region: str | None = Field(default=None, description="Région Bedrock pour cet appel (sinon AWS_REGION).")
 
 
 class ChatResponse(BaseModel):
@@ -61,10 +65,27 @@ def chat_completion(body: ChatRequest) -> ChatResponse:
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
-    region = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "eu-west-3"))
+    region = (
+        (body.region or "").strip()
+        or os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "eu-west-3"))
+    )
     model_id = (os.getenv("BEDROCK_MODEL_ID") or "").strip() or MODEL_ID_DEFAULT
     max_tokens = int(os.getenv("BEDROCK_CHAT_MAX_TOKENS", os.getenv("BEDROCK_MAX_TOKENS", "4096")))
-    prof = (os.getenv("AWS_PROFILE") or "").strip() or None
+
+    ak = (body.aws_access_key_id or "").strip()
+    sk = (body.aws_secret_access_key or "").strip()
+    inline: dict[str, str] | None = None
+    if ak or sk:
+        if not ak or not sk:
+            raise HTTPException(
+                status_code=400,
+                detail="aws_access_key_id et aws_secret_access_key sont requis ensemble pour des identifiants dans la requête.",
+            )
+        inline = {"aws_access_key_id": ak, "aws_secret_access_key": sk}
+        st = (body.aws_session_token or "").strip()
+        if st:
+            inline["aws_session_token"] = st
+    prof = None if inline else ((os.getenv("AWS_PROFILE") or "").strip() or None)
 
     try:
         reply = bedrock_converse_chat(
@@ -73,6 +94,7 @@ def chat_completion(body: ChatRequest) -> ChatResponse:
             max_tokens=max_tokens,
             model_id=model_id,
             profile_name=prof,
+            inline_credentials=inline,
             system_prompt=CHAT_SYSTEM_PROMPT,
         )
     except Exception as e:
