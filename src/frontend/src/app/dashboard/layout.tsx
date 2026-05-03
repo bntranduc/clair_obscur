@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
+  Home,
   LayoutDashboard,
   ShieldAlert,
   Activity,
@@ -82,12 +83,16 @@ export default function DashboardLayout({
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
+          <NavSection title="Vue d’ensemble">
+            <NavLink href="/dashboard" icon={<Home size={18} strokeWidth={2} />} label="Accueil SOC" />
+          </NavSection>
+
           <NavSection title="Données">
             <NavLink href="/dashboard/logs" icon={<Search size={18} strokeWidth={2} />} label="Logs normalisés" />
           </NavSection>
 
           <NavSection title="Monitoring">
-            <NavLink href="/dashboard" icon={<ShieldAlert size={18} strokeWidth={2} />} label="Alertes" />
+            <NavLink href="/dashboard/alertes" icon={<ShieldAlert size={18} strokeWidth={2} />} label="Alertes" />
             <NavLink
               href="/dashboard/analytics"
               icon={<LayoutDashboard size={18} strokeWidth={2} />}
@@ -157,10 +162,7 @@ function NavSection({ title, children }: { title: string; children: React.ReactN
 
 function NavLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
   const pathname = usePathname();
-  const active =
-    href === "/dashboard"
-      ? pathname === "/dashboard" || pathname.startsWith("/dashboard/alertes")
-      : pathname === href || pathname.startsWith(`${href}/`);
+  const active = pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <Link

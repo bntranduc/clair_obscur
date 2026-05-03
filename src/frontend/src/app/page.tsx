@@ -42,7 +42,7 @@ export default function Home() {
               />
             </Link>
             <Link
-              href="/dashboard"
+              href="/dashboard/alertes"
               className="focus-ring text-sm font-medium text-zinc-400 underline-offset-4 transition hover:text-white hover:underline"
             >
               Vue anomalies
