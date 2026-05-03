@@ -2,16 +2,13 @@ import type { NormalizedEvent } from "@/lib/normalizedLog";
 import type { SiemDashboard } from "@/types/siemAnalytics";
 import { getBackendBaseUrl } from "@/lib/apiBackendUrl";
 
-/**
- * Par défaut : chaîne vide → ``fetch`` sur ``/api/v1/…`` (rewrites Next → API).
- * Si ``NEXT_PUBLIC_SKIP_API_REWRITE=1`` : appel direct vers l’URL backend (CORS doit autoriser l’origine du front).
- */
+/** URL de base FastAPI (ex. EC2). Équivaut à un ``curl`` sur la même URL. */
 function getApiUrl(): string {
-  if (process.env.NEXT_PUBLIC_SKIP_API_REWRITE === "1") {
-    return getBackendBaseUrl();
-  }
-  return "";
+  return getBackendBaseUrl();
 }
+
+/** Même origine CORS que l’API (``allow_credentials=False`` → pas de cookies cross-origin). */
+const apiFetchInit: RequestInit = { cache: "no-store", credentials: "omit" };
 
 /** Query optionnelle : pagination / bucket S3. Les creds AWS restent côté API (rôle IAM ou ``.env`` du conteneur). */
 export type FetchNormalizedLogsOptions = {
@@ -40,7 +37,7 @@ export async function fetchNormalizedLogs(
 
   const q = sp.toString();
   const url = `${getApiUrl()}/api/v1/logs/normalized${q ? `?${q}` : ""}`;
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, apiFetchInit);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     let detail = text;
@@ -59,7 +56,7 @@ export async function fetchNormalizedLogs(
 
 export async function fetchSiemAnalytics(hours: number = 24): Promise<SiemDashboard> {
   const url = `${getApiUrl()}/api/v1/analytics/siem?hours=${encodeURIComponent(String(hours))}`;
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, apiFetchInit);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`GET /api/v1/analytics/siem failed (${res.status}) ${text}`.trim());
@@ -94,10 +91,10 @@ export async function postChat(messages: ChatApiMessage[], options?: PostChatOpt
   }
 
   const res = await fetch(url, {
+    ...apiFetchInit,
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    cache: "no-store",
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -153,6 +150,7 @@ export async function streamAgenticChat(
   if (options?.conversationId?.trim()) body.conversation_id = options.conversationId.trim();
 
   const res = await fetch(`${getApiUrl()}/api/v1/agentic/stream`, {
+    ...apiFetchInit,
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
     body: JSON.stringify(body),
@@ -190,6 +188,7 @@ export async function submitAgenticApproval(
   approved: boolean,
 ): Promise<boolean> {
   const res = await fetch(`${getApiUrl()}/api/v1/agentic/approval`, {
+    ...apiFetchInit,
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
