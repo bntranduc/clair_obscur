@@ -16,8 +16,13 @@ def predict_alerts(
     model_id: str | None = None,
     max_tokens: int = 4096,
     profile_name: str | None = None,
+    inline_aws_credentials: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Retourne une liste d’alertes dict (``severity``, ``alert_summary``, ``detection``, ``confidence``, ``reasons``, ``exhaustive_analysis``, ``remediation_proposal``, etc.)."""
+    """Retourne une liste d’alertes dict (``severity``, ``alert_summary``, ``detection``, etc.).
+
+    Inférence **Bedrock** uniquement : ``inline_aws_credentials`` pour cette requête, sinon
+    ``profile_name`` / chaîne d’identifiants par défaut (``AWS_PROFILE``, rôle instance, etc.).
+    """
     incidents = aggregate_signals(detect_signals_window_1h(events))
     if not incidents:
         return []
@@ -28,6 +33,7 @@ def predict_alerts(
         model_id=model_id or MODEL_ID_DEFAULT,
         max_tokens=max_tokens,
         profile_name=profile_name,
+        inline_aws_credentials=inline_aws_credentials,
     )
     if isinstance(out, list):
         return [x for x in out if isinstance(x, dict)]

@@ -9,8 +9,8 @@ export default function PlaceholderPanel({
 }) {
   return (
     <div className="mx-auto flex max-w-2xl flex-col items-center justify-center px-4 py-16 text-center">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500/15 to-violet-500/15 ring-1 ring-white/10">
-        <Layers className="h-8 w-8 text-cyan-400/80" strokeWidth={1.5} />
+      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/15 to-red-500/15 ring-1 ring-white/10">
+        <Layers className="h-8 w-8 text-blue-400/80" strokeWidth={1.5} />
       </div>
       <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{title}</h1>
       {description && <p className="mt-3 text-[15px] leading-relaxed text-zinc-400">{description}</p>}

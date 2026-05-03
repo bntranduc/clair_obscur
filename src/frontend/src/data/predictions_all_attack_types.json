@@ -352,6 +352,1156 @@
       },
       "exhaustive_analysis": "Récit — 10:00–10:30 UTC : le compte backup_svc associé à 198.51.100.200 présente un transfert sortant volumineux vers des régions atypiques. Scénario exfiltration possible : couper les flux, vérifier clés API et buckets, forensic sur la chaîne backup.",
       "remediation_proposal": "1) Suspendre immédiatement les transferts et les credentials backup_svc. 2) Inspecter buckets et politiques IAM. 3) Bloquer destinations unknown-cn au pare-feu sortant. 4) Conserver preuves pour enquête ; restaurer depuis sauvegardes saines si compromission."
+    },
+    {
+      "challenge_id": "ldap_injection",
+      "severity": "high",
+      "alert_summary": "LDAP injection : filtres malformés et wildcard abuse.",
+      "detection": {
+        "attack_type": "ldap_injection",
+        "attacker_ips": [
+          "192.0.2.10"
+        ],
+        "victim_accounts": [],
+        "attack_start_time": "2026-02-02T11:00:00Z",
+        "attack_end_time": "2026-02-02T11:08:00Z",
+        "indicators": {
+          "wildcard_queries": 12
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook ldap_injection.",
+        "severity": "Niveau high selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario ldap_injection entre 2026-02-02T11:00:00Z et 2026-02-02T11:08:00Z : corrélation réseau/auth/application conforme au type ldap_injection. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "xss_reflected",
+      "severity": "medium",
+      "alert_summary": "XSS réfléchi : paramètres GET avec charges script.",
+      "detection": {
+        "attack_type": "xss_reflected",
+        "attacker_ips": [
+          "198.51.100.41"
+        ],
+        "victim_accounts": [],
+        "attack_start_time": "2026-02-02T12:00:00Z",
+        "attack_end_time": "2026-02-02T12:15:00Z",
+        "indicators": {
+          "payload_hits": 6
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook xss_reflected.",
+        "severity": "Niveau medium selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario xss_reflected entre 2026-02-02T12:00:00Z et 2026-02-02T12:15:00Z : corrélation réseau/auth/application conforme au type xss_reflected. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "command_injection",
+      "severity": "critical",
+      "alert_summary": "Injection de commandes OS via champ upload métadonnées.",
+      "detection": {
+        "attack_type": "command_injection",
+        "attacker_ips": [
+          "203.0.113.51"
+        ],
+        "victim_accounts": [
+          "www-data"
+        ],
+        "attack_start_time": "2026-02-02T13:00:00Z",
+        "attack_end_time": "2026-02-02T13:05:00Z",
+        "indicators": {
+          "shell_metachars": true
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [
+            0.76
+          ],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook command_injection.",
+        "severity": "Niveau critical selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [
+            "Actif ou compte impacté #1."
+          ],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario command_injection entre 2026-02-02T13:00:00Z et 2026-02-02T13:05:00Z : corrélation réseau/auth/application conforme au type command_injection. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "xml_xxe",
+      "severity": "high",
+      "alert_summary": "XXE : DTD externe et lecture fichier via entités.",
+      "detection": {
+        "attack_type": "xml_xxe",
+        "attacker_ips": [
+          "198.51.100.52"
+        ],
+        "victim_accounts": [],
+        "attack_start_time": "2026-02-02T14:00:00Z",
+        "attack_end_time": "2026-02-02T14:03:00Z",
+        "indicators": {
+          "external_dtd": true
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook xml_xxe.",
+        "severity": "Niveau high selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario xml_xxe entre 2026-02-02T14:00:00Z et 2026-02-02T14:03:00Z : corrélation réseau/auth/application conforme au type xml_xxe. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "jwt_algorithm_confusion",
+      "severity": "high",
+      "alert_summary": "JWT : bascule alg none/HS confusion sur endpoint API.",
+      "detection": {
+        "attack_type": "jwt_algorithm_confusion",
+        "attacker_ips": [
+          "203.0.113.60"
+        ],
+        "victim_accounts": [
+          "api_consumer"
+        ],
+        "attack_start_time": "2026-02-02T15:00:00Z",
+        "attack_end_time": "2026-02-02T15:20:00Z",
+        "indicators": {
+          "tampered_tokens": 4
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [
+            0.76
+          ],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook jwt_algorithm_confusion.",
+        "severity": "Niveau high selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [
+            "Actif ou compte impacté #1."
+          ],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario jwt_algorithm_confusion entre 2026-02-02T15:00:00Z et 2026-02-02T15:20:00Z : corrélation réseau/auth/application conforme au type jwt_algorithm_confusion. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "dns_tunneling",
+      "severity": "high",
+      "alert_summary": "Tunnel DNS : sous-domaines longs et entropie élevée.",
+      "detection": {
+        "attack_type": "dns_tunneling",
+        "attacker_ips": [
+          "192.0.2.77"
+        ],
+        "victim_accounts": [],
+        "attack_start_time": "2026-02-02T16:00:00Z",
+        "attack_end_time": "2026-02-02T18:00:00Z",
+        "indicators": {
+          "subdomain_entropy": 6.2,
+          "qpm": 420
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook dns_tunneling.",
+        "severity": "Niveau high selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario dns_tunneling entre 2026-02-02T16:00:00Z et 2026-02-02T18:00:00Z : corrélation réseau/auth/application conforme au type dns_tunneling. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "port_scan",
+      "severity": "low",
+      "alert_summary": "Balayage TCP multi-ports depuis une source unique.",
+      "detection": {
+        "attack_type": "port_scan",
+        "attacker_ips": [
+          "198.51.100.88"
+        ],
+        "victim_accounts": [],
+        "attack_start_time": "2026-02-02T19:00:00Z",
+        "attack_end_time": "2026-02-02T19:04:00Z",
+        "indicators": {
+          "distinct_ports": 180
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook port_scan.",
+        "severity": "Niveau low selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario port_scan entre 2026-02-02T19:00:00Z et 2026-02-02T19:04:00Z : corrélation réseau/auth/application conforme au type port_scan. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "kerberoasting",
+      "severity": "high",
+      "alert_summary": "Kerberoasting : demandes TGS excessive pour SPN sensibles.",
+      "detection": {
+        "attack_type": "kerberoasting",
+        "attacker_ips": [
+          "10.0.0.50"
+        ],
+        "victim_accounts": [
+          "svc_sql"
+        ],
+        "attack_start_time": "2026-02-02T20:00:00Z",
+        "attack_end_time": "2026-02-02T20:25:00Z",
+        "indicators": {
+          "tgs_requests": 95
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [
+            0.76
+          ],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook kerberoasting.",
+        "severity": "Niveau high selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [
+            "Actif ou compte impacté #1."
+          ],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario kerberoasting entre 2026-02-02T20:00:00Z et 2026-02-02T20:25:00Z : corrélation réseau/auth/application conforme au type kerberoasting. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "pass_the_hash",
+      "severity": "high",
+      "alert_summary": "PtH : réutilisation hash NTLM sur plusieurs hôtes.",
+      "detection": {
+        "attack_type": "pass_the_hash",
+        "attacker_ips": [
+          "10.0.1.12"
+        ],
+        "victim_accounts": [
+          "adm_dupont",
+          "wk_laptop_42"
+        ],
+        "attack_start_time": "2026-02-03T07:00:00Z",
+        "attack_end_time": "2026-02-03T07:40:00Z",
+        "indicators": {
+          "lateral_hosts": 5
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [
+            0.76,
+            0.74
+          ],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook pass_the_hash.",
+        "severity": "Niveau high selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [
+            "Actif ou compte impacté #1.",
+            "Actif ou compte impacté #2."
+          ],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario pass_the_hash entre 2026-02-03T07:00:00Z et 2026-02-03T07:40:00Z : corrélation réseau/auth/application conforme au type pass_the_hash. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "ransomware_precursors",
+      "severity": "critical",
+      "alert_summary": "Signaux précurseurs : suppression VSS et renommage masse.",
+      "detection": {
+        "attack_type": "ransomware_precursors",
+        "attacker_ips": [
+          "192.0.2.99"
+        ],
+        "victim_accounts": [
+          "endpoint_finance_07"
+        ],
+        "attack_start_time": "2026-02-03T08:00:00Z",
+        "attack_end_time": "2026-02-03T08:12:00Z",
+        "indicators": {
+          "mass_renames": 2400
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [
+            0.76
+          ],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook ransomware_precursors.",
+        "severity": "Niveau critical selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [
+            "Actif ou compte impacté #1."
+          ],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario ransomware_precursors entre 2026-02-03T08:00:00Z et 2026-02-03T08:12:00Z : corrélation réseau/auth/application conforme au type ransomware_precursors. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "api_rate_abuse",
+      "severity": "medium",
+      "alert_summary": "Abus API clé publique : débit 20× baseline.",
+      "detection": {
+        "attack_type": "api_rate_abuse",
+        "attacker_ips": [
+          "203.0.113.120"
+        ],
+        "victim_accounts": [
+          "partner_app"
+        ],
+        "attack_start_time": "2026-02-03T09:00:00Z",
+        "attack_end_time": "2026-02-03T09:50:00Z",
+        "indicators": {
+          "rps_peak": 890
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [
+            0.76
+          ],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook api_rate_abuse.",
+        "severity": "Niveau medium selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [
+            "Actif ou compte impacté #1."
+          ],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario api_rate_abuse entre 2026-02-03T09:00:00Z et 2026-02-03T09:50:00Z : corrélation réseau/auth/application conforme au type api_rate_abuse. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "graphql_introspection_abuse",
+      "severity": "medium",
+      "alert_summary": "GraphQL : introspection intensive puis requêtes profondes.",
+      "detection": {
+        "attack_type": "graphql_introspection_abuse",
+        "attacker_ips": [
+          "198.51.100.130"
+        ],
+        "victim_accounts": [],
+        "attack_start_time": "2026-02-03T10:00:00Z",
+        "attack_end_time": "2026-02-03T10:18:00Z",
+        "indicators": {
+          "depth": 14
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook graphql_introspection_abuse.",
+        "severity": "Niveau medium selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario graphql_introspection_abuse entre 2026-02-03T10:00:00Z et 2026-02-03T10:18:00Z : corrélation réseau/auth/application conforme au type graphql_introspection_abuse. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "smtp_open_relay_probe",
+      "severity": "low",
+      "alert_summary": "Probes open relay SMTP depuis botnet léger.",
+      "detection": {
+        "attack_type": "smtp_open_relay_probe",
+        "attacker_ips": [
+          "192.0.2.140"
+        ],
+        "victim_accounts": [],
+        "attack_start_time": "2026-02-03T11:00:00Z",
+        "attack_end_time": "2026-02-03T11:30:00Z",
+        "indicators": {
+          "probe_sources": 8
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook smtp_open_relay_probe.",
+        "severity": "Niveau low selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario smtp_open_relay_probe entre 2026-02-03T11:00:00Z et 2026-02-03T11:30:00Z : corrélation réseau/auth/application conforme au type smtp_open_relay_probe. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "webshell_upload",
+      "severity": "critical",
+      "alert_summary": "Upload fichier web shell déguisé en image.",
+      "detection": {
+        "attack_type": "webshell_upload",
+        "attacker_ips": [
+          "203.0.113.155"
+        ],
+        "victim_accounts": [
+          "upload_svc"
+        ],
+        "attack_start_time": "2026-02-03T12:00:00Z",
+        "attack_end_time": "2026-02-03T12:06:00Z",
+        "indicators": {
+          "double_extension": true
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [
+            0.76
+          ],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook webshell_upload.",
+        "severity": "Niveau critical selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [
+            "Actif ou compte impacté #1."
+          ],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario webshell_upload entre 2026-02-03T12:00:00Z et 2026-02-03T12:06:00Z : corrélation réseau/auth/application conforme au type webshell_upload. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "memory_scraping_pattern",
+      "severity": "high",
+      "alert_summary": "Accès mémoire LSASS-like hors baseline EDR.",
+      "detection": {
+        "attack_type": "memory_scraping_pattern",
+        "attacker_ips": [
+          "10.0.2.33"
+        ],
+        "victim_accounts": [
+          "wk_sales_19"
+        ],
+        "attack_start_time": "2026-02-03T13:00:00Z",
+        "attack_end_time": "2026-02-03T13:22:00Z",
+        "indicators": {
+          "sensitive_reads": 14
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [
+            0.76
+          ],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook memory_scraping_pattern.",
+        "severity": "Niveau high selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [
+            "Actif ou compte impacté #1."
+          ],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario memory_scraping_pattern entre 2026-02-03T13:00:00Z et 2026-02-03T13:22:00Z : corrélation réseau/auth/application conforme au type memory_scraping_pattern. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "supply_chain_npm_anomaly",
+      "severity": "high",
+      "alert_summary": "CI : dépendance NPM avec post-install suspect.",
+      "detection": {
+        "attack_type": "supply_chain_npm_anomaly",
+        "attacker_ips": [
+          "198.51.100.166"
+        ],
+        "victim_accounts": [
+          "build_bot"
+        ],
+        "attack_start_time": "2026-02-03T14:00:00Z",
+        "attack_end_time": "2026-02-03T14:45:00Z",
+        "indicators": {
+          "package_age_hours": 3
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [
+            0.76
+          ],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook supply_chain_npm_anomaly.",
+        "severity": "Niveau high selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [
+            "Actif ou compte impacté #1."
+          ],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario supply_chain_npm_anomaly entre 2026-02-03T14:00:00Z et 2026-02-03T14:45:00Z : corrélation réseau/auth/application conforme au type supply_chain_npm_anomaly. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "cloud_metadata_scan",
+      "severity": "medium",
+      "alert_summary": "Tentatives répétées vers métadonnées IMDS.",
+      "detection": {
+        "attack_type": "cloud_metadata_scan",
+        "attacker_ips": [
+          "203.0.113.170"
+        ],
+        "victim_accounts": [],
+        "attack_start_time": "2026-02-03T15:00:00Z",
+        "attack_end_time": "2026-02-03T15:05:00Z",
+        "indicators": {
+          "imds_paths": 22
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook cloud_metadata_scan.",
+        "severity": "Niveau medium selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario cloud_metadata_scan entre 2026-02-03T15:00:00Z et 2026-02-03T15:05:00Z : corrélation réseau/auth/application conforme au type cloud_metadata_scan. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "kubernetes_secret_enum",
+      "severity": "high",
+      "alert_summary": "Kube API : énumération secrets depuis token compromis.",
+      "detection": {
+        "attack_type": "kubernetes_secret_enum",
+        "attacker_ips": [
+          "10.43.0.18"
+        ],
+        "victim_accounts": [
+          "sa_reader"
+        ],
+        "attack_start_time": "2026-02-03T16:00:00Z",
+        "attack_end_time": "2026-02-03T16:35:00Z",
+        "indicators": {
+          "list_calls": 67
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [
+            0.76
+          ],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook kubernetes_secret_enum.",
+        "severity": "Niveau high selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [
+            "Actif ou compte impacté #1."
+          ],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario kubernetes_secret_enum entre 2026-02-03T16:00:00Z et 2026-02-03T16:35:00Z : corrélation réseau/auth/application conforme au type kubernetes_secret_enum. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "sip_voip_fraud",
+      "severity": "medium",
+      "alert_summary": "SIP INVITE flood vers trunk pour fraude télécom.",
+      "detection": {
+        "attack_type": "sip_voip_fraud",
+        "attacker_ips": [
+          "192.0.2.188"
+        ],
+        "victim_accounts": [],
+        "attack_start_time": "2026-02-03T17:00:00Z",
+        "attack_end_time": "2026-02-03T17:50:00Z",
+        "indicators": {
+          "invite_rate": 340
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook sip_voip_fraud.",
+        "severity": "Niveau medium selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario sip_voip_fraud entre 2026-02-03T17:00:00Z et 2026-02-03T17:50:00Z : corrélation réseau/auth/application conforme au type sip_voip_fraud. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
+    },
+    {
+      "challenge_id": "ioc_match_tor_exit",
+      "severity": "low",
+      "alert_summary": "Destination correspond à sortie Tor connue.",
+      "detection": {
+        "attack_type": "ioc_match_tor_exit",
+        "attacker_ips": [
+          "185.220.101.5"
+        ],
+        "victim_accounts": [
+          "guest_wifi"
+        ],
+        "attack_start_time": "2026-02-03T18:00:00Z",
+        "attack_end_time": "2026-02-03T18:10:00Z",
+        "indicators": {
+          "feed_hit": "tor-exit-2026q1"
+        }
+      },
+      "detection_time_seconds": 300,
+      "confidence": {
+        "challenge_id": 0.87,
+        "severity": 0.87,
+        "alert_summary": 0.86,
+        "remediation_proposal": 0.8,
+        "detection": {
+          "attack_type": 0.85,
+          "attacker_ips": [
+            0.79
+          ],
+          "victim_accounts": [
+            0.76
+          ],
+          "attack_start_time": 0.78,
+          "attack_end_time": 0.77,
+          "indicators": 0.75
+        },
+        "detection_time_seconds": 1.0
+      },
+      "reasons": {
+        "challenge_id": "Corrélation playbook ioc_match_tor_exit.",
+        "severity": "Niveau low selon agrégats incidents.",
+        "alert_summary": "Résumé synthétique à partir des IoC et fenêtre temporelle.",
+        "remediation_proposal": "Actions défensives alignées SIEM / durcissement.",
+        "detection": {
+          "attack_type": "Motifs compatibles avec la famille MITRE / logs agrégés.",
+          "attacker_ips": [
+            "Source dominante sur la fenêtre."
+          ],
+          "victim_accounts": [
+            "Actif ou compte impacté #1."
+          ],
+          "attack_start_time": "Premier événement au-dessus du seuil.",
+          "attack_end_time": "Dernier événement avant retour baseline.",
+          "indicators": "Indicateurs numériques ou booléens extraits des preuves."
+        },
+        "detection_time_seconds": "Constante pipeline (300)."
+      },
+      "exhaustive_analysis": "Récit synthétique — scénario ioc_match_tor_exit entre 2026-02-03T18:00:00Z et 2026-02-03T18:10:00Z : corrélation réseau/auth/application conforme au type ioc_match_tor_exit. Prioriser confinement, journaux et validation humaine.",
+      "remediation_proposal": "1) Isoler les hosts/sources concernés. 2) Révoquer sessions / rotates secrets si nécessaire. 3) Mettre à jour règles détection. 4) Documenter pour astreinte."
     }
   ]
 }

@@ -36,7 +36,7 @@ export default async function AlertDetailPage({ params }: Props) {
       <div className={`mb-6 ${BODY_PAD}`}>
         <Link
           href="/dashboard"
-          className="group inline-flex items-center gap-2 text-[12px] font-medium text-zinc-500 transition hover:text-cyan-300"
+          className="group inline-flex items-center gap-2 text-[12px] font-medium text-zinc-500 transition hover:text-blue-300"
         >
           <ArrowLeft size={14} className="transition group-hover:-translate-x-0.5" aria-hidden />
           Retour aux alertes

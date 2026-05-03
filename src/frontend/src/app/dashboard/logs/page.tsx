@@ -49,13 +49,13 @@ export default function NormalizedLogsPage() {
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0 space-y-1">
-          <div className="flex items-center gap-2 text-cyan-400/90">
+          <div className="flex items-center gap-2 text-blue-400/90">
             <Table2 size={18} strokeWidth={2} className="shrink-0" aria-hidden />
             <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">Données S3</span>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Logs normalisés</h1>
           <p className="max-w-2xl text-[15px] leading-relaxed text-zinc-400">
-            Schéma aligné sur <code className="rounded-md bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[13px] text-cyan-300/90">NormalizedEvent</code> — défilement horizontal pour parcourir toutes les colonnes.
+            Schéma aligné sur <code className="rounded-md bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[13px] text-blue-300/90">NormalizedEvent</code> — défilement horizontal pour parcourir toutes les colonnes.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -71,7 +71,7 @@ export default function NormalizedLogsPage() {
             type="button"
             onClick={() => void load()}
             disabled={loading}
-            className="focus-ring inline-flex items-center gap-2 rounded-xl bg-cyan-500/15 px-4 py-2.5 text-sm font-medium text-cyan-100 ring-1 ring-cyan-400/25 transition hover:bg-cyan-500/25 disabled:opacity-60"
+            className="focus-ring inline-flex items-center gap-2 rounded-xl bg-blue-500/15 px-4 py-2.5 text-sm font-medium text-blue-100 ring-1 ring-blue-400/25 transition hover:bg-blue-500/25 disabled:opacity-60"
           >
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} aria-hidden />
             Actualiser
@@ -91,7 +91,7 @@ export default function NormalizedLogsPage() {
       <div className="panel overflow-hidden">
         {loading && rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-24 text-zinc-500">
-            <Loader2 size={28} className="animate-spin text-cyan-500/70" aria-hidden />
+            <Loader2 size={28} className="animate-spin text-blue-500/70" aria-hidden />
             <p className="text-sm">Chargement des événements…</p>
           </div>
         ) : (
@@ -120,7 +120,7 @@ export default function NormalizedLogsPage() {
                   {rows.map((row, ri) => (
                     <tr
                       key={`${page}-${ri}`}
-                      className="group transition-colors hover:bg-cyan-500/[0.04] odd:bg-white/[0.015]"
+                      className="group transition-colors hover:bg-blue-500/[0.04] odd:bg-white/[0.015]"
                     >
                       <td
                         className="sticky left-0 z-10 border-b border-r border-white/[0.05] bg-zinc-950/90 px-3 py-2 text-zinc-500 tabular-nums shadow-[4px_0_12px_-4px_rgba(0,0,0,0.4)] backdrop-blur-sm group-hover:bg-zinc-900/95"
@@ -197,7 +197,7 @@ export default function NormalizedLogsPage() {
             type="button"
             onClick={() => setPage((p) => p + 1)}
             disabled={!hasMore || loading}
-            className="focus-ring inline-flex items-center gap-1.5 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-2.5 text-sm font-medium text-cyan-100 transition hover:bg-cyan-500/20 disabled:pointer-events-none disabled:opacity-35"
+            className="focus-ring inline-flex items-center gap-1.5 rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-2.5 text-sm font-medium text-blue-100 transition hover:bg-blue-500/20 disabled:pointer-events-none disabled:opacity-35"
           >
             Suivant
             <ChevronRight size={18} aria-hidden />

@@ -170,7 +170,7 @@ export function buildUnifiedAlertRows(alert: ModelAlert): UnifiedRow[] {
 
 export function scoreToneClass(p: number): string {
   if (p >= 0.88) return "text-emerald-400";
-  if (p >= 0.75) return "text-cyan-400";
+  if (p >= 0.75) return "text-blue-400";
   if (p >= 0.6) return "text-amber-300";
   return "text-orange-400";
 }

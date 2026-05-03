@@ -204,6 +204,7 @@ def predict_submission_from_incidents(
     model_id: str = MODEL_ID_DEFAULT,
     max_tokens: int = 4096,
     profile_name: str | None = None,
+    inline_aws_credentials: Mapping[str, str] | None = None,
 ) -> Any:
     allowed = tuple(allowed_attack_types or DEFAULT_ALLOWED_ATTACK_TYPES)
     prompt = build_prediction_prompt(
@@ -214,8 +215,9 @@ def predict_submission_from_incidents(
     raw = bedrock_converse_text(
         prompt,
         region=region,
-        max_tokens=max_tokens,
         model_id=model_id,
+        max_tokens=max_tokens,
         profile_name=profile_name,
+        inline_credentials=dict(inline_aws_credentials) if inline_aws_credentials else None,
     )
     return _extract_json_value(raw)

@@ -1,5 +1,5 @@
-import PlaceholderPanel from "@/components/dashboard/PlaceholderPanel";
+import AgenticChatAssistant from "@/components/dashboard/AgenticChatAssistant";
 
 export default function AgenticPage() {
-  return <PlaceholderPanel title="Agentic" />;
+  return <AgenticChatAssistant />;
 }

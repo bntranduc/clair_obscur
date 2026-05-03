@@ -9,8 +9,7 @@ import os
 from collections.abc import Iterator
 from typing import Any
 
-import boto3
-
+from backend.aws.aws_client import AwsClient
 from backend.log.normalization.normalize import normalize
 from backend.log.normalization.types import NormalizedEvent
 
@@ -21,17 +20,14 @@ def _s3_client(
     prefix: str | None,
     region: str | None,
     profile_name: str | None,
+    credentials: dict[str, str] | None,
 ) -> tuple[Any, str, str]:
     b = bucket or os.getenv("RAW_LOGS_BUCKET", "clair-obscure-raw-logs").strip()
     pfx = prefix or os.getenv("RAW_LOGS_PREFIX", "raw/opensearch/logs-raw/").strip()
     reg = region or os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "eu-west-3"))
-    prof = (
-        profile_name
-        if profile_name is not None
-        else (os.getenv("AWS_PROFILE", "").strip() or None)
-    )
-    session = boto3.Session(profile_name=prof) if prof else boto3.Session()
-    return session.client("s3", region_name=reg), b, pfx
+    prof = profile_name if profile_name is not None else (os.getenv("AWS_PROFILE", "").strip() or None)
+    aws = AwsClient(region_name=str(reg), profile_name=prof if not credentials else None, credentials=credentials)
+    return aws.client("s3"), b, pfx
 
 
 def iter_normalized_events(
@@ -40,6 +36,7 @@ def iter_normalized_events(
     prefix: str | None = None,
     region: str | None = None,
     profile_name: str | None = None,
+    credentials: dict[str, str] | None = None,
     newest_first: bool = True,
 ) -> Iterator[NormalizedEvent]:
     """Parcourt le préfixe S3 et produit un flux d’événements normalisés (un par ligne JSON valide).
@@ -47,7 +44,11 @@ def iter_normalized_events(
     Ordre par défaut : objets S3 du plus récent au plus ancien, puis lignes dans chaque fichier.
     """
     s3, b, pfx = _s3_client(
-        bucket=bucket, prefix=prefix, region=region, profile_name=profile_name
+        bucket=bucket,
+        prefix=prefix,
+        region=region,
+        profile_name=profile_name,
+        credentials=credentials,
     )
     metas: list[dict[str, Any]] = []
     paginator = s3.get_paginator("list_objects_v2")
@@ -107,6 +108,7 @@ def fetch_normalized_page(
     prefix: str | None = None,
     region: str | None = None,
     profile_name: str | None = None,
+    credentials: dict[str, str] | None = None,
 ) -> tuple[list[NormalizedEvent], bool]:
     """Retourne une fenêtre paginée ``(items, has_more)`` sans charger tout le bucket."""
     if skip < 0:
@@ -122,6 +124,7 @@ def fetch_normalized_page(
         prefix=prefix,
         region=region,
         profile_name=profile_name,
+        credentials=credentials,
     ):
         idx += 1
         if idx < skip:
@@ -141,6 +144,7 @@ def fetch_all_normalized_logs(
     prefix: str | None = None,
     region: str | None = None,
     profile_name: str | None = None,
+    credentials: dict[str, str] | None = None,
 ) -> list[NormalizedEvent]:
     """Parcourt tout le préfixe S3 — charge tout en mémoire (éviter sur des buckets énormes)."""
     return list(
@@ -149,5 +153,6 @@ def fetch_all_normalized_logs(
             prefix=prefix,
             region=region,
             profile_name=profile_name,
+            credentials=credentials,
         )
     )

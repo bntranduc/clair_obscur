@@ -64,6 +64,29 @@ Ou depuis n’importe où sous la racine du repo :
 ./src/backend/scripts/run_model_serve.sh
 ```
 
+**API minimale** (Bedrock uniquement, identifiants dans le corps de `POST /predict`) — peu de dépendances, adaptée EC2 :
+
+```bash
+pip install -r src/backend/model/requirements-model-api.txt
+./src/backend/model/run_model_api.sh
+```
+
+Image Docker : `docker build -f src/backend/model/Dockerfile -t clair-model-api .` puis `docker run --rm -p 8080:8080 -e BEDROCK_MODEL_ID=eu.anthropic.claude-opus-4-6-v1 clair-model-api`.
+
+Exemple `POST /predict` (corps JSON — **ne pas** commiter de vraies clés) :
+
+```bash
+curl -sS -X POST http://127.0.0.1:8080/predict -H "Content-Type: application/json" -d @- <<'EOF'
+{
+  "events": [{"timestamp":"2026-01-15T08:00:01Z","log_source":"authentication","source_ip":"203.0.113.50","auth_method":"ssh","status":"failure","username":"root"}],
+  "aws_access_key_id": "AKIA...",
+  "aws_secret_access_key": "...",
+  "aws_session_token": "IQoJb3...",
+  "region": "eu-west-3"
+}
+EOF
+```
+
 (Si `uvicorn` est introuvable : utilise toujours `python3 -m uvicorn` après `pip install -r …`.)
 
 ### 4. Sécurité groupe (Security Group)
@@ -110,10 +133,13 @@ Chaque élément de `alerts` inclut `challenge_id`, **`severity`** (`low` \| `me
 |--------|------|
 | `prompt/expected_predictions_example.json` | Exemple embarqué (ssh_brute_force) injecté dans le prompt Bedrock |
 | `prompt/expected_predictions_second_type_example.json` | Deuxième exemple (credential_stuffing) |
-| `src/api/model_app.py` | FastAPI `/health`, `/predict`, `/api/v1/analytics/siem` |
-| `predict.py` | `predict_alerts(events, …)` (profil AWS / chaîne boto3) |
-| `requirements-api.txt` | Dépendances pour l’API |
-| `../scripts/run_model_serve.sh` | Lance uvicorn avec `PYTHONPATH` correct |
+| `src/api/model_app.py` | FastAPI complète : `/predict` (Bedrock ; `aws_credentials` optionnel dans le corps), chat, agentic, SIEM |
+| `model_api.py` | **API minimale EC2** : `/health`, `/predict` uniquement — Bedrock avec identifiants AWS dans le corps de la requête |
+| `Dockerfile` | Image légère : `docker build -f src/backend/model/Dockerfile -t clair-model-api .` (contexte = racine du repo) |
+| `requirements-model-api.txt` | Dépendances pour `model_api` / image Docker |
+| `run_model_api.sh` | Lance `uvicorn backend.model.model_api:app` en local (`HOST`, `PORT`) |
+| `predict.py` | `predict_alerts` → Bedrock (`inline_aws_credentials` ou profil / rôle ; voir `incident_llm`) |
+| `../scripts/run_model_serve.sh` | Lance `api.model_app:app` avec `PYTHONPATH` correct |
 | `../scripts/sqs_predict_worker.py` | Worker SQS → S3 logs → prédictions → S3 JSON |
 
 Le modèle `.env` versionné est à la racine du repo : `.env.example`.

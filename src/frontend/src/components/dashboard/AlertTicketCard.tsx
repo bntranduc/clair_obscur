@@ -36,7 +36,7 @@ export default function AlertTicketCard({
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
           <Link
             href={href}
-            className="min-w-0 shrink font-semibold tracking-tight text-white transition hover:text-cyan-100 sm:max-w-[12rem] sm:truncate lg:max-w-[16rem]"
+            className="min-w-0 shrink font-semibold tracking-tight text-white transition hover:text-blue-100 sm:max-w-[12rem] sm:truncate lg:max-w-[16rem]"
           >
             {title}
           </Link>
@@ -51,7 +51,7 @@ export default function AlertTicketCard({
         </div>
         <Link
           href={href}
-          className="inline-flex shrink-0 items-center gap-0.5 self-start text-[12px] font-medium text-cyan-400/90 transition hover:text-cyan-300 sm:self-center"
+          className="inline-flex shrink-0 items-center gap-0.5 self-start text-[12px] font-medium text-blue-400/90 transition hover:text-blue-300 sm:self-center"
         >
           <span>Ouvrir</span>
           <ChevronRight size={15} className="transition group-hover/card:translate-x-0.5" aria-hidden />
@@ -68,7 +68,7 @@ export default function AlertTicketCard({
           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             <Link
               href={href}
-              className="min-w-0 shrink text-lg font-semibold tracking-tight text-white transition hover:text-cyan-100 sm:truncate"
+              className="min-w-0 shrink text-lg font-semibold tracking-tight text-white transition hover:text-blue-100 sm:truncate"
             >
               {title}
             </Link>
@@ -94,7 +94,7 @@ export default function AlertTicketCard({
       </Link>
       <Link
         href={href}
-        className="mt-0.5 inline-flex items-center gap-1 text-[12px] font-medium text-cyan-400/90 transition hover:text-cyan-300"
+        className="mt-0.5 inline-flex items-center gap-1 text-[12px] font-medium text-blue-400/90 transition hover:text-blue-300"
       >
         <span>Ouvrir le ticket</span>
         <ChevronRight size={16} className="transition group-hover/card:translate-x-0.5" aria-hidden />

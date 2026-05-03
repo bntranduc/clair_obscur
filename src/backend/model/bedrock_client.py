@@ -3,10 +3,30 @@ from __future__ import annotations
 import os
 from typing import Any, Optional
 
-import boto3
-from botocore.config import Config
+from backend.aws.aws_client import AwsClient
 
 MODEL_ID_DEFAULT = "eu.anthropic.claude-opus-4-6-v1"
+
+
+def _aws_client_for_bedrock(
+    *,
+    region: str,
+    profile_name: Optional[str] = None,
+    inline_credentials: Optional[dict[str, str]] = None,
+) -> AwsClient:
+    if inline_credentials:
+        ak = (inline_credentials.get("aws_access_key_id") or "").strip()
+        sk = (inline_credentials.get("aws_secret_access_key") or "").strip()
+        if not ak or not sk:
+            raise ValueError("inline_credentials requires aws_access_key_id and aws_secret_access_key")
+        creds: dict[str, str] = {"aws_access_key_id": ak, "aws_secret_access_key": sk}
+        st = (inline_credentials.get("aws_session_token") or "").strip()
+        if st:
+            creds["aws_session_token"] = st
+        return AwsClient(region_name=region, credentials=creds)
+    prof = profile_name if profile_name is not None else os.getenv("AWS_PROFILE")
+    prof = (prof or "").strip() or None
+    return AwsClient(region_name=region, profile_name=prof)
 
 
 def bedrock_converse_text(
@@ -16,6 +36,7 @@ def bedrock_converse_text(
     max_tokens: int = 512,
     model_id: str = MODEL_ID_DEFAULT,
     profile_name: Optional[str] = None,
+    inline_credentials: Optional[dict[str, str]] = None,
 ) -> str:
     if not prompt or not prompt.strip():
         raise ValueError("prompt must be a non-empty string")
@@ -23,18 +44,11 @@ def bedrock_converse_text(
     if not (model_id or "").strip():
         model_id = MODEL_ID_DEFAULT
 
-    prof = profile_name if profile_name is not None else os.getenv("AWS_PROFILE")
-    prof = (prof or "").strip() or None
-    session_kw: dict[str, Any] = {"region_name": region}
-    if prof:
-        session_kw["profile_name"] = prof
-
-    session = boto3.Session(**session_kw)
-
-    client = session.client(
-        "bedrock-runtime",
-        config=Config(retries={"max_attempts": 5, "mode": "standard"}),
-    )
+    client = _aws_client_for_bedrock(
+        region=region,
+        profile_name=profile_name,
+        inline_credentials=inline_credentials,
+    ).bedrock_runtime()
 
     resp = client.converse(
         modelId=model_id,
@@ -63,23 +77,18 @@ def bedrock_converse_chat(
     max_tokens: int = 4096,
     model_id: str = MODEL_ID_DEFAULT,
     profile_name: Optional[str] = None,
+    inline_credentials: Optional[dict[str, str]] = None,
     system_prompt: Optional[str] = None,
 ) -> str:
     """Conversation multi-tours (rôles ``user`` / ``assistant``) via l’API Converse."""
     if not messages:
         raise ValueError("messages must be non-empty")
 
-    prof = profile_name if profile_name is not None else os.getenv("AWS_PROFILE")
-    prof = (prof or "").strip() or None
-    session_kw: dict[str, Any] = {"region_name": region}
-    if prof:
-        session_kw["profile_name"] = prof
-
-    session = boto3.Session(**session_kw)
-    client = session.client(
-        "bedrock-runtime",
-        config=Config(retries={"max_attempts": 5, "mode": "standard"}),
-    )
+    client = _aws_client_for_bedrock(
+        region=region,
+        profile_name=profile_name,
+        inline_credentials=inline_credentials,
+    ).bedrock_runtime()
 
     converse_messages: list[dict[str, Any]] = []
     for m in messages:
