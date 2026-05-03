@@ -38,7 +38,7 @@ const quickLinks: {
 }[] = [
   {
     href: "/dashboard/logs",
-    label: "Logs normalisés",
+    label: "Logs",
     hint: "Recherche & corrélation sur le brut S3",
     icon: <Search size={22} strokeWidth={1.75} />,
     accent: "from-sky-500/25 to-blue-600/10 ring-sky-500/20",

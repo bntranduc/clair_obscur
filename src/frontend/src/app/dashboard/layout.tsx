@@ -13,8 +13,10 @@ import {
   BookOpen,
   ChevronsLeft,
   ChevronsRight,
+  MessageCircle,
 } from "lucide-react";
 import UserMenu from "@/components/UserMenu";
+import AgenticChatAssistant from "@/components/dashboard/AgenticChatAssistant";
 
 const SIDEBAR_LS_KEY = "clair-sidebar-nav-open";
 
@@ -23,8 +25,11 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const isChatPage = pathname === "/dashboard/chat";
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarReady, setSidebarReady] = useState(false);
+  const [assistantSheetOpen, setAssistantSheetOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -50,18 +55,39 @@ export default function DashboardLayout({
     setSidebarOpen((o) => !o);
   }, []);
 
+  useEffect(() => {
+    if (isChatPage) setAssistantSheetOpen(false);
+  }, [isChatPage]);
+
+  useEffect(() => {
+    if (!assistantSheetOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAssistantSheetOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [assistantSheetOpen]);
+
   return (
     <div className="flex h-screen overflow-hidden bg-zinc-950 text-zinc-100">
       <div
         id="dashboard-sidebar"
         className={`relative shrink-0 overflow-hidden border-r border-white/[0.06] transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
-          sidebarOpen ? "w-[17.5rem]" : "w-0 border-transparent"
+          sidebarOpen ? "w-[17.5rem]" : "w-12 border-white/[0.06]"
         }`}
-        aria-hidden={!sidebarOpen}
       >
-        <aside className="sidebar-glass flex h-full w-[17.5rem] flex-col">
-        <div className="border-b border-white/[0.07] px-5 py-6">
-          <Link href="/" className="group flex items-center gap-3">
+        <aside
+          className={`sidebar-glass flex h-full flex-col ${sidebarOpen ? "w-[17.5rem]" : "w-12"}`}
+        >
+        {sidebarOpen ? (
+          <>
+        <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.07] px-3 py-4">
+          <Link href="/" className="group flex min-w-0 flex-1 items-center gap-3">
             <span
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-400/20 to-red-500/25 ring-1 ring-white/10 transition group-hover:ring-blue-400/30"
               aria-hidden
@@ -77,15 +103,26 @@ export default function DashboardLayout({
               </span>
             </div>
           </Link>
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.1] bg-zinc-950/60 text-zinc-300 transition hover:border-blue-500/35 hover:bg-zinc-900/90 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+            aria-expanded={true}
+            aria-controls="dashboard-sidebar"
+            title="Masquer la navigation"
+            aria-label="Masquer la navigation"
+          >
+            <ChevronsLeft size={20} strokeWidth={2} aria-hidden />
+          </button>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4" aria-label="Navigation principale">
           <NavSection title="Vue d’ensemble">
             <NavLink href="/dashboard" icon={<Home size={18} strokeWidth={2} />} label="Accueil SOC" />
           </NavSection>
 
           <NavSection title="Données">
-            <NavLink href="/dashboard/logs" icon={<Search size={18} strokeWidth={2} />} label="Logs normalisés" />
+            <NavLink href="/dashboard/logs" icon={<Search size={18} strokeWidth={2} />} label="Logs" />
           </NavSection>
 
           <NavSection title="Monitoring">
@@ -110,20 +147,26 @@ export default function DashboardLayout({
         <div className="border-t border-white/[0.07] p-3">
           <UserMenu />
         </div>
+          </>
+        ) : (
+          <div className="flex flex-1 flex-col items-center border-b border-white/[0.07] py-3">
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.1] bg-zinc-950/60 text-zinc-300 transition hover:border-blue-500/35 hover:bg-zinc-900/90 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+              aria-expanded={false}
+              aria-controls="dashboard-sidebar"
+              title="Afficher la navigation"
+              aria-label="Afficher la navigation"
+            >
+              <ChevronsRight size={20} strokeWidth={2} aria-hidden />
+            </button>
+          </div>
+        )}
         </aside>
       </div>
 
       <main className="app-main-bg relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          className="absolute left-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.1] bg-zinc-950/85 text-zinc-300 shadow-lg shadow-black/30 backdrop-blur-md transition hover:border-blue-500/35 hover:bg-zinc-900/95 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-          aria-expanded={sidebarOpen}
-          aria-controls="dashboard-sidebar"
-          title={sidebarOpen ? "Masquer la navigation" : "Afficher la navigation"}
-        >
-          {sidebarOpen ? <ChevronsLeft size={20} strokeWidth={2} aria-hidden /> : <ChevronsRight size={20} strokeWidth={2} aria-hidden />}
-        </button>
         <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
           <div className="dashboard-aurora dashboard-aurora--a" />
           <div className="dashboard-aurora dashboard-aurora--b" />
@@ -137,6 +180,40 @@ export default function DashboardLayout({
             {children}
           </div>
         </div>
+
+        {!isChatPage ? (
+          <button
+            type="button"
+            onClick={() => setAssistantSheetOpen(true)}
+            className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full border border-white/[0.14] bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-[0_8px_32px_-4px_rgba(37,99,235,0.55)] ring-1 ring-white/10 transition hover:scale-[1.04] hover:shadow-blue-500/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400"
+            title="Assistant IA"
+            aria-label="Ouvrir l’assistant IA"
+          >
+            <MessageCircle size={26} strokeWidth={2} aria-hidden />
+          </button>
+        ) : null}
+
+        {assistantSheetOpen ? (
+          <div
+            className="fixed inset-0 z-50 flex bg-black/50 backdrop-blur-[1px]"
+            role="presentation"
+            onClick={() => setAssistantSheetOpen(false)}
+          >
+            <div className="min-h-0 min-w-0 flex-1" aria-hidden />
+            <div
+              className="flex h-full min-h-0 w-full max-w-[min(100vw,40rem)] shrink-0 flex-col border-l border-white/[0.1] bg-zinc-950 shadow-2xl sm:max-w-[min(100vw,44rem)] md:max-w-[min(100vw,48rem)]"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="clair-assistant-sheet-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span id="clair-assistant-sheet-title" className="sr-only">
+                Assistant IA
+              </span>
+              <AgenticChatAssistant variant="overlay" onClose={() => setAssistantSheetOpen(false)} />
+            </div>
+          </div>
+        ) : null}
       </main>
     </div>
   );
@@ -151,9 +228,16 @@ function NavSection({ title, children }: { title: string; children: React.ReactN
   );
 }
 
+function isNavLinkActive(pathname: string, href: string): boolean {
+  if (href === "/dashboard") {
+    return pathname === "/dashboard";
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 function NavLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
   const pathname = usePathname();
-  const active = pathname === href || pathname.startsWith(`${href}/`);
+  const active = isNavLinkActive(pathname, href);
 
   return (
     <Link

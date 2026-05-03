@@ -14,6 +14,7 @@ import {
   Brain,
   ListTree,
   ShieldAlert,
+  X,
 } from "lucide-react";
 import { streamAgenticChat, submitAgenticApproval, type AgenticSsePayload } from "@/lib/api";
 import { ChatSessionSidebar } from "@/components/dashboard/ChatSessionSidebar";
@@ -171,7 +172,12 @@ function loadStore(): AgenticStore {
   return { sessions: [s], activeId: s.id };
 }
 
-export default function AgenticChatAssistant() {
+export type AgenticChatAssistantProps = {
+  variant?: "page" | "overlay";
+  onClose?: () => void;
+};
+
+export default function AgenticChatAssistant({ variant = "page", onClose }: AgenticChatAssistantProps) {
   const [store, setStore] = useState<AgenticStore | null>(null);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -602,7 +608,13 @@ export default function AgenticChatAssistant() {
 
   if (!store || !activeSession) {
     return (
-      <div className="flex flex-col h-full items-center justify-center text-gray-400 text-sm">
+      <div
+        className={
+          variant === "page"
+            ? "flex h-full flex-col items-center justify-center rounded-xl text-sm text-gray-400 ring-1 ring-inset ring-white/[0.1]"
+            : "flex h-full min-h-[40vh] w-full flex-col items-center justify-center text-sm text-gray-400"
+        }
+      >
         Chargement des conversations…
       </div>
     );
@@ -611,7 +623,24 @@ export default function AgenticChatAssistant() {
   const sidebarSessions = store.sessions.map(({ id, title, updatedAt }) => ({ id, title, updatedAt }));
 
   return (
-    <div className="flex h-full min-h-0">
+    <div
+      className={
+        variant === "page"
+          ? "relative flex h-full min-h-0 w-full max-w-full flex-1 flex-row overflow-hidden rounded-xl ring-1 ring-inset ring-white/[0.1]"
+          : "relative flex h-full min-h-0 w-full max-w-full flex-row overflow-hidden rounded-none md:rounded-l-2xl"
+      }
+    >
+      {onClose ? (
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.1] bg-zinc-900/90 text-zinc-300 transition hover:border-white/20 hover:bg-zinc-800 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+          title="Fermer"
+          aria-label="Fermer l’assistant"
+        >
+          <X size={18} strokeWidth={2} aria-hidden />
+        </button>
+      ) : null}
       <ChatSessionSidebar
         sessions={sidebarSessions}
         activeId={store.activeId}

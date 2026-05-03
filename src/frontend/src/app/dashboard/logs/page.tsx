@@ -53,7 +53,7 @@ export default function NormalizedLogsPage() {
             <Table2 size={18} strokeWidth={2} className="shrink-0" aria-hidden />
             <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">Données S3</span>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Logs normalisés</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Logs</h1>
           <p className="max-w-2xl text-[15px] leading-relaxed text-zinc-400">
             Schéma aligné sur <code className="rounded-md bg-zinc-800/80 px-1.5 py-0.5 font-mono text-[13px] text-blue-300/90">NormalizedEvent</code> — défilement horizontal pour parcourir toutes les colonnes.
           </p>
