@@ -8,7 +8,6 @@ from typing import Any
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import AliasChoices, BaseModel, Field
 from botocore.exceptions import BotoCoreError, ClientError
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -38,77 +37,57 @@ def root() -> dict[str, str]:
     return {"service": "clair-obscur-api"}
 
 
+def _credentials_from_query(
+    aws_access_key_id: str | None,
+    aws_secret_access_key: str | None,
+    aws_session_token: str | None,
+) -> dict[str, str] | None:
+    """Identifiants inline pour S3 ; ``None`` si aucune clé (chaîne boto3 par défaut sur le serveur)."""
+    ak = (aws_access_key_id or "").strip()
+    sk = (aws_secret_access_key or "").strip()
+    st = (aws_session_token or "").strip()
+    if not ak and not sk:
+        return None
+    if not ak or not sk:
+        raise ValueError(
+            "AWS_ACCESS_KEY_ID et AWS_SECRET_ACCESS_KEY sont requis ensemble dans la requête."
+        )
+    out: dict[str, str] = {"aws_access_key_id": ak, "aws_secret_access_key": sk}
+    if st:
+        out["aws_session_token"] = st
+    return out
+
+
 @app.get(f"{API_V1}/logs/normalized")
 def normalized_logs(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=500),
+    raw_logs_bucket: str | None = Query(None),
+    raw_logs_prefix: str | None = Query(None),
+    region: str | None = Query(None),
+    AWS_ACCESS_KEY_ID: str | None = Query(None, description="Optionnel ; sinon rôle / env du serveur."),
+    AWS_SECRET_ACCESS_KEY: str | None = Query(None, description="Optionnel ; à utiliser avec AWS_ACCESS_KEY_ID."),
+    AWS_SESSION_TOKEN: str | None = Query(None, description="Optionnel (sessions STS)."),
 ) -> dict[str, Any]:
-    """Paginate les événements normalisés (ordre S3 : objets récents d’abord)."""
+    """Paginate les événements normalisés. Identifiants AWS en **query** (mêmes noms que les variables d’env).
+
+    Attention : les secrets apparaissent dans l’URL (logs serveur, historique). Préférer le rôle IAM quand possible.
+    """
     try:
-        items, has_more = fetch_normalized_page(skip=skip, limit=limit)
-    except (ClientError, BotoCoreError) as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
-    return {
-        "items": items,
-        "has_more": has_more,
-        "skip": skip,
-        "limit": limit,
-    }
-
-
-class NormalizedLogsPostBody(BaseModel):
-    """Corps JSON : pagination + identifiants AWS optionnels (même noms qu’en variables d’env)."""
-
-    skip: int = Field(0, ge=0)
-    limit: int = Field(50, ge=1, le=500)
-    raw_logs_bucket: str | None = None
-    raw_logs_prefix: str | None = None
-    region: str | None = None
-    aws_access_key_id: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices("aws_access_key_id", "AWS_ACCESS_KEY_ID"),
-    )
-    aws_secret_access_key: str | None = Field(
-        default=None,
-        repr=False,
-        validation_alias=AliasChoices("aws_secret_access_key", "AWS_SECRET_ACCESS_KEY"),
-    )
-    aws_session_token: str | None = Field(
-        default=None,
-        repr=False,
-        validation_alias=AliasChoices("aws_session_token", "AWS_SESSION_TOKEN"),
-    )
-
-    def credentials_or_none(self) -> dict[str, str] | None:
-        ak = (self.aws_access_key_id or "").strip()
-        sk = (self.aws_secret_access_key or "").strip()
-        if not ak and not sk:
-            return None
-        if not ak or not sk:
-            raise ValueError(
-                "aws_access_key_id et aws_secret_access_key sont requis ensemble pour des identifiants dans la requête."
-            )
-        out: dict[str, str] = {"aws_access_key_id": ak, "aws_secret_access_key": sk}
-        st = (self.aws_session_token or "").strip()
-        if st:
-            out["aws_session_token"] = st
-        return out
-
-
-@app.post(f"{API_V1}/logs/normalized")
-def normalized_logs_post(body: NormalizedLogsPostBody) -> dict[str, Any]:
-    """Identifiants AWS dans le corps (ex. ``curl -d @payload.json``) ; sans creds, chaîne par défaut boto3."""
-    try:
-        creds = body.credentials_or_none()
+        creds = _credentials_from_query(
+            AWS_ACCESS_KEY_ID,
+            AWS_SECRET_ACCESS_KEY,
+            AWS_SESSION_TOKEN,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     try:
         items, has_more = fetch_normalized_page(
-            skip=body.skip,
-            limit=body.limit,
-            bucket=(body.raw_logs_bucket or "").strip() or None,
-            prefix=(body.raw_logs_prefix or "").strip() or None,
-            region=(body.region or "").strip() or None,
+            skip=skip,
+            limit=limit,
+            bucket=(raw_logs_bucket or "").strip() or None,
+            prefix=(raw_logs_prefix or "").strip() or None,
+            region=(region or "").strip() or None,
             credentials=creds,
         )
     except (ClientError, BotoCoreError) as e:
@@ -116,8 +95,8 @@ def normalized_logs_post(body: NormalizedLogsPostBody) -> dict[str, Any]:
     return {
         "items": items,
         "has_more": has_more,
-        "skip": body.skip,
-        "limit": body.limit,
+        "skip": skip,
+        "limit": limit,
     }
 
 
