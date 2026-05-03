@@ -8,11 +8,12 @@ function getApiUrl(): string {
   return API_BASE_URL.replace(/\/+$/, "");
 }
 
-/** Champs optionnels alignés sur ``POST /api/v1/logs/normalized`` (rôle IAM sur le serveur si omis). */
+/** Query optionnelle pour ``GET /api/v1/logs/normalized`` (identifiants = mêmes noms que les variables AWS). */
 export type FetchNormalizedLogsOptions = {
   raw_logs_bucket?: string;
   raw_logs_prefix?: string;
   region?: string;
+  /** Équivalent query ``AWS_ACCESS_KEY_ID`` (ne pas utiliser côté navigateur en prod). */
   aws_access_key_id?: string;
   aws_secret_access_key?: string;
   aws_session_token?: string;
@@ -29,32 +30,27 @@ export async function fetchNormalizedLogs(
   params: { skip?: number; limit?: number },
   options?: FetchNormalizedLogsOptions,
 ): Promise<NormalizedLogsPage> {
-  const body: Record<string, string | number> = {
-    skip: params.skip ?? 0,
-    limit: params.limit ?? 50,
-  };
-  if (options?.raw_logs_bucket?.trim()) body.raw_logs_bucket = options.raw_logs_bucket.trim();
-  if (options?.raw_logs_prefix?.trim()) body.raw_logs_prefix = options.raw_logs_prefix.trim();
-  if (options?.region?.trim()) body.region = options.region.trim();
+  const sp = new URLSearchParams();
+  sp.set("skip", String(params.skip ?? 0));
+  sp.set("limit", String(params.limit ?? 50));
+  if (options?.raw_logs_bucket?.trim()) sp.set("raw_logs_bucket", options.raw_logs_bucket.trim());
+  if (options?.raw_logs_prefix?.trim()) sp.set("raw_logs_prefix", options.raw_logs_prefix.trim());
+  if (options?.region?.trim()) sp.set("region", options.region.trim());
   const ak = options?.aws_access_key_id?.trim();
   const sk = options?.aws_secret_access_key?.trim();
   const st = options?.aws_session_token?.trim();
   if (ak && sk) {
-    body.aws_access_key_id = ak;
-    body.aws_secret_access_key = sk;
-    if (st) body.aws_session_token = st;
+    sp.set("AWS_ACCESS_KEY_ID", ak);
+    sp.set("AWS_SECRET_ACCESS_KEY", sk);
+    if (st) sp.set("AWS_SESSION_TOKEN", st);
   }
 
-  const url = `${getApiUrl()}/api/v1/logs/normalized`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
+  const q = sp.toString();
+  const url = `${getApiUrl()}/api/v1/logs/normalized${q ? `?${q}` : ""}`;
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`POST /api/v1/logs/normalized failed (${res.status}) ${text}`.trim());
+    throw new Error(`GET /api/v1/logs/normalized failed (${res.status}) ${text}`.trim());
   }
   return (await res.json()) as NormalizedLogsPage;
 }
