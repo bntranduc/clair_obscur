@@ -159,11 +159,7 @@ export default function NormalizedLogsPage() {
                           <code className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-400">
                             RAW_LOGS_*
                           </code>{" "}
-                          et que l’API tourne (ex. port{" "}
-                          <code className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-400">
-                            8020
-                          </code>
-                          ).
+                          et que l’API sur l’instance EC2 est joignable.
                         </p>
                       </td>
                     </tr>
