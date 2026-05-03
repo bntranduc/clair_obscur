@@ -32,7 +32,7 @@ def _scan_bucket_alerts(
     prof = (
         profile_name
         if profile_name is not None
-        else (os.getenv("AWS_PROFILE", "").strip() or None)
+        else ((os.getenv("AWS_PROFILE") or "").strip() or None)
     )
     aws = AwsClient(region_name=str(reg), profile_name=prof if not credentials else None, credentials=credentials)
     s3 = aws.client("s3")

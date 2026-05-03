@@ -46,6 +46,12 @@ class AwsClient:
             kw.update(self._credentials)
         elif self._profile_name:
             kw["profile_name"] = self._profile_name
+        # botocore lit ``AWS_PROFILE`` même sans ``profile_name`` dans ``kw`` ;
+        # une valeur vide → ProfileNotFound (profil "").
+        if "profile_name" not in kw:
+            ap = os.environ.get("AWS_PROFILE")
+            if ap is not None and not str(ap).strip():
+                del os.environ["AWS_PROFILE"]
         return boto3.Session(**kw)
 
     def client(self, service_name: str, **kwargs: Any) -> Any:

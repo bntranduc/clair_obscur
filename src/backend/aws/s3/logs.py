@@ -25,7 +25,11 @@ def _s3_client(
     b = bucket or os.getenv("RAW_LOGS_BUCKET", "clair-obscure-raw-logs").strip()
     pfx = prefix or os.getenv("RAW_LOGS_PREFIX", "raw/opensearch/logs-raw/").strip()
     reg = region or os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "eu-west-3"))
-    prof = profile_name if profile_name is not None else (os.getenv("AWS_PROFILE", "").strip() or None)
+    prof = (
+        profile_name
+        if profile_name is not None
+        else ((os.getenv("AWS_PROFILE") or "").strip() or None)
+    )
     aws = AwsClient(region_name=str(reg), profile_name=prof if not credentials else None, credentials=credentials)
     return aws.client("s3"), b, pfx
 

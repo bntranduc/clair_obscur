@@ -6,8 +6,9 @@ import os
 from typing import Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 load_dotenv(os.path.join(_REPO_ROOT, ".env"), override=False)
@@ -48,6 +49,57 @@ def normalized_logs(
         "has_more": has_more,
         "skip": skip,
         "limit": limit,
+    }
+
+
+class NormalizedLogsPostBody(BaseModel):
+    """Identifiants AWS optionnels dans le corps (éviter les secrets en query GET)."""
+
+    skip: int = Field(0, ge=0)
+    limit: int = Field(50, ge=1, le=500)
+    raw_logs_bucket: str | None = None
+    raw_logs_prefix: str | None = None
+    region: str | None = None
+    aws_access_key_id: str | None = Field(default=None)
+    aws_secret_access_key: str | None = Field(default=None, repr=False)
+    aws_session_token: str | None = Field(default=None, repr=False)
+
+    def credentials_or_none(self) -> dict[str, str] | None:
+        ak = (self.aws_access_key_id or "").strip()
+        sk = (self.aws_secret_access_key or "").strip()
+        if not ak and not sk:
+            return None
+        if not ak or not sk:
+            raise ValueError(
+                "aws_access_key_id et aws_secret_access_key sont requis ensemble pour des identifiants dans la requête."
+            )
+        out: dict[str, str] = {"aws_access_key_id": ak, "aws_secret_access_key": sk}
+        st = (self.aws_session_token or "").strip()
+        if st:
+            out["aws_session_token"] = st
+        return out
+
+
+@app.post(f"{API_V1}/logs/normalized")
+def normalized_logs_post(body: NormalizedLogsPostBody) -> dict[str, Any]:
+    """Comme ``GET …/logs/normalized`` avec identifiants AWS optionnels dans le corps (STS / clés)."""
+    try:
+        creds = body.credentials_or_none()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    items, has_more = fetch_normalized_page(
+        skip=body.skip,
+        limit=body.limit,
+        bucket=(body.raw_logs_bucket or "").strip() or None,
+        prefix=(body.raw_logs_prefix or "").strip() or None,
+        region=(body.region or "").strip() or None,
+        credentials=creds,
+    )
+    return {
+        "items": items,
+        "has_more": has_more,
+        "skip": body.skip,
+        "limit": body.limit,
     }
 
 
