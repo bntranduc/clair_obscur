@@ -1,0 +1,174 @@
+[1/4] Chargement de datasets/opensearch_range_logs_sql_injection_plus2h.json ...
+      373188 événements normalisés en 2.45s
+
+[2/4] Détection des signaux (fenêtre 1h) ...
+      4 signal(s) détecté(s) en 2.31s
+
+--- Signaux détectés ---
+  rule=SQL_INJECTION  ip=185.220.101.45  user=None  ts=2026-01-19T14:30:00.406Z
+  rule=WEB_SQLI_AUTOMATED  ip=185.220.101.45  user=None  ts=2026-01-19T14:30:00.406000Z
+  rule=SQL_INJECTION_MANY_500  ip=185.220.101.45  user=None  ts=2026-01-19T14:30:00.406Z
+  rule=SQL_INJECTION_EXFIL  ip=185.220.101.45  user=None  ts=2026-01-19T14:00:00.199Z
+
+[3/4] Agrégation des signaux ...
+      4 incident(s) agrégé(s)
+
+--- Incidents agrégés ---
+[
+  {
+    "rule_id": "SQL_INJECTION",
+    "source_ip": "185.220.101.45",
+    "username": "",
+    "hostname": "web-prod-01",
+    "start_time": "2026-01-19T14:30:00.406000Z",
+    "end_time": "2026-01-19T16:30:17.596000Z",
+    "indicators": {
+      "hits": 342,
+      "window_seconds": 900,
+      "top_kv": {
+        "top_reasons=[('UNION SELECT', 219), ('DROP TABLE', 68), (\"'OR 1=1'\", 55)]": 1,
+        "sample_uris=[\"/api/v1/users?id=1' OR '1'='1\", '/api/v1/products?category=1; DROP TABLE users--', \"/search?q=test' UNION SELECT username,password FROM users--\", \"/search?q=test' UNION SELECT username,password FROM users--\", \"/search?q=test' UNION SELECT username,password FROM users--\"]": 1
+      }
+    },
+    "evidence_ids": []
+  },
+  {
+    "rule_id": "WEB_SQLI_AUTOMATED",
+    "source_ip": "185.220.101.45",
+    "username": "",
+    "hostname": "",
+    "start_time": "2026-01-19T14:30:00.406000Z",
+    "end_time": "2026-01-19T16:30:17.596000Z",
+    "indicators": {
+      "sqli_hits": 342,
+      "volume_window_sec": 300,
+      "window_seconds": 900
+    },
+    "evidence_ids": []
+  },
+  {
+    "rule_id": "SQL_INJECTION_MANY_500",
+    "source_ip": "185.220.101.45",
+    "username": "",
+    "hostname": "",
+    "start_time": "2026-01-19T14:30:00.406000Z",
+    "end_time": "2026-01-19T16:17:28.391000Z",
+    "indicators": {
+      "status_code_500": 77,
+      "window_seconds": 900
+    },
+    "evidence_ids": []
+  },
+  {
+    "rule_id": "SQL_INJECTION_EXFIL",
+    "source_ip": "185.220.101.45",
+    "username": "",
+    "hostname": "",
+    "start_time": "2026-01-19T14:00:00.199000Z",
+    "end_time": "2026-01-19T16:43:10.701000Z",
+    "indicators": {
+      "exfil_bytes": 52301306,
+      "exfil_mb": 49.88,
+      "window_seconds": 900,
+      "top_kv": {
+        "internal_sources=['10.0.1.10']": 1
+      }
+    },
+    "evidence_ids": []
+  }
+]
+
+[4/4] Envoi au LLM (eu.anthropic.claude-opus-4-6-v1, region=eu-west-3) ...
+      Réponse reçue en 4.31s
+
+--- Résultat LLM (brut) ---
+[
+  {
+    "challenge_id": "sql_injection",
+    "detection": {
+      "attack_type": "sql_injection",
+      "attacker_ips": [
+        "185.220.101.45"
+      ],
+      "victim_accounts": [],
+      "attack_start_time": "2026-01-19T14:00:00.199000Z",
+      "attack_end_time": "2026-01-19T16:43:10.701000Z",
+      "indicators": {
+        "rule_ids": [
+          "SQL_INJECTION",
+          "WEB_SQLI_AUTOMATED",
+          "SQL_INJECTION_MANY_500",
+          "SQL_INJECTION_EXFIL"
+        ],
+        "sqli_hits": 342,
+        "status_code_500_count": 77,
+        "top_patterns": [
+          "UNION SELECT (219)",
+          "DROP TABLE (68)",
+          "'OR 1=1' (55)"
+        ],
+        "sample_uris": [
+          "/api/v1/users?id=1' OR '1'='1",
+          "/api/v1/products?category=1; DROP TABLE users--",
+          "/search?q=test' UNION SELECT username,password FROM users--"
+        ],
+        "target_host": "web-prod-01",
+        "exfiltration_detected": true,
+        "exfil_bytes": 52301306,
+        "exfil_mb": 49.88,
+        "internal_sources": [
+          "10.0.1.10"
+        ]
+      }
+    },
+    "detection_time_seconds": 300
+  }
+]
+
+--- Alertes format ground-truth ---
+[
+  {
+    "_index": "ground-truth-ds1",
+    "_id": "sql_injection",
+    "_source": {
+      "dataset": 1,
+      "challenge_id": "sql_injection",
+      "attack_type": "sql_injection",
+      "attacker_ips": [
+        "185.220.101.45"
+      ],
+      "victim_accounts": [],
+      "attack_window": {
+        "start": "2026-01-19T14:00:00.199000Z",
+        "end": "2026-01-19T16:43:10.701000Z"
+      },
+      "indicators": {
+        "rule_ids": [
+          "SQL_INJECTION",
+          "WEB_SQLI_AUTOMATED",
+          "SQL_INJECTION_MANY_500",
+          "SQL_INJECTION_EXFIL"
+        ],
+        "sqli_hits": 342,
+        "status_code_500_count": 77,
+        "top_patterns": [
+          "UNION SELECT (219)",
+          "DROP TABLE (68)",
+          "'OR 1=1' (55)"
+        ],
+        "sample_uris": [
+          "/api/v1/users?id=1' OR '1'='1",
+          "/api/v1/products?category=1; DROP TABLE users--",
+          "/search?q=test' UNION SELECT username,password FROM users--"
+        ],
+        "target_host": "web-prod-01",
+        "exfiltration_detected": true,
+        "exfil_bytes": 52301306,
+        "exfil_mb": 49.88,
+        "internal_sources": [
+          "10.0.1.10"
+        ]
+      }
+    }
+  }
+]
