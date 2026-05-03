@@ -25,7 +25,7 @@ export default function UnifiedAlertSheet({ rows }: { rows: UnifiedRow[] }) {
           ) : null}
           <div className="flex items-start justify-between gap-3">
             <p
-              className={`min-w-0 flex-1 text-[13px] leading-snug text-zinc-100 ${row.isContinuation ? "border-l border-cyan-500/20 pl-2" : ""}`}
+              className={`min-w-0 flex-1 text-[13px] leading-snug text-zinc-100 ${row.isContinuation ? "border-l border-blue-500/20 pl-2" : ""}`}
             >
               {row.isContinuation ? <span className="text-zinc-600">↳ </span> : null}
               {row.value}

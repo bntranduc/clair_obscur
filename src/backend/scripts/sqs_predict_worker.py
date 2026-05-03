@@ -36,8 +36,7 @@ _SRC = _REPO / "src"
 if _SRC.is_dir() and str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-import boto3  # noqa: E402
-
+from backend.aws.aws_client import AwsClient  # noqa: E402
 from backend.log.normalization.normalize import normalize  # noqa: E402
 
 
@@ -240,12 +239,9 @@ def main() -> int:
     mid_env = (os.getenv("BEDROCK_MODEL_ID") or "").strip() or None
     max_tok = int(os.getenv("BEDROCK_MAX_TOKENS", "4096"))
 
-    session_kw: dict[str, Any] = {"region_name": region}
-    if prof:
-        session_kw["profile_name"] = prof
-    session = boto3.session.Session(**session_kw)
-    sqs = session.client("sqs")
-    s3 = session.client("s3")
+    aws = AwsClient.for_env(region_name=region)
+    sqs = aws.client("sqs")
+    s3 = aws.client("s3")
 
     print(
         f"worker start queue={queue_url!r} mode={predict_mode!r} "

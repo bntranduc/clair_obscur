@@ -1,7 +1,9 @@
 # --- Secrets & credentials (ne jamais committer) ---
 keys/
+secrets/
 *.pem
 *.ppk
+*.key
 .env
 .env.*
 !.env.example
@@ -22,6 +24,7 @@ __pycache__/
 .Python
 .venv/
 venv/
+.uv/
 *.egg-info/
 .eggs/
 dist/
@@ -29,6 +32,8 @@ build/
 pip-wheel-metadata/
 .dmypy.json
 dmypy.json
+*.pkl
+*.pickle
 
 # --- Tests / linters ---
 .pytest_cache/
@@ -79,6 +84,10 @@ blob-report/
 # --- IDE / OS ---
 .idea/
 .vscode/
+# Cursor : cache local ; les règles projet peuvent rester sous .cursor/rules/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
 *.swp
 *~
 .DS_Store
@@ -89,6 +98,8 @@ Thumbs.db
 *.log
 /tmp/
 tmp/
+*.sqlite
+*.sqlite3
 
 datasets/**
 !datasets/fake_data/

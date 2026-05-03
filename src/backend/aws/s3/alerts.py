@@ -6,7 +6,7 @@ import json
 import os
 from typing import Any
 
-import boto3
+from backend.aws.aws_client import AwsClient
 
 BUCKET_PREDICTIONS_PROD = "model-attacks-predictions"
 BUCKET_PREDICTIONS_TMP = "model-attacks-predictions-tmp"
@@ -15,17 +15,13 @@ DEFAULT_ALERTS_BUCKET = BUCKET_PREDICTIONS_TMP
 DEFAULT_ALERTS_PREFIX = "predictions/"
 
 
-def _s3_session(region: str, profile_name: str | None):
-    session = boto3.Session(profile_name=profile_name) if profile_name else boto3.Session()
-    return session.client("s3", region_name=region)
-
-
 def _scan_bucket_alerts(
     *,
     bucket: str | None = None,
     prefix: str | None = None,
     region: str | None = None,
     profile_name: str | None = None,
+    credentials: dict[str, str] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Retourne (liste d’alertes dict, statistiques de parcours)."""
     b = bucket or os.getenv("PREDICTIONS_BUCKET", DEFAULT_ALERTS_BUCKET).strip()
@@ -38,7 +34,8 @@ def _scan_bucket_alerts(
         if profile_name is not None
         else (os.getenv("AWS_PROFILE", "").strip() or None)
     )
-    s3 = _s3_session(reg, prof)
+    aws = AwsClient(region_name=str(reg), profile_name=prof if not credentials else None, credentials=credentials)
+    s3 = aws.client("s3")
 
     out: list[dict[str, Any]] = []
     stats: dict[str, Any] = {
@@ -99,6 +96,7 @@ def fetch_all_alerts_from_s3(
     prefix: str | None = None,
     region: str | None = None,
     profile_name: str | None = None,
+    credentials: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Liste tous les objets sous ``prefix``, lit chaque JSON (champ ``alerts``),
     renvoie la concaténation des alertes (dict uniquement).
@@ -114,7 +112,11 @@ def fetch_all_alerts_from_s3(
     CLI : ``python -m backend.aws.s3.alerts`` (tmp), ``--prod`` ou ``--tmp``.
     """
     alerts, _ = _scan_bucket_alerts(
-        bucket=bucket, prefix=prefix, region=region, profile_name=profile_name
+        bucket=bucket,
+        prefix=prefix,
+        region=region,
+        profile_name=profile_name,
+        credentials=credentials,
     )
     return alerts
 
@@ -125,10 +127,15 @@ def print_all_alerts_from_s3(
     prefix: str | None = None,
     region: str | None = None,
     profile_name: str | None = None,
+    credentials: dict[str, str] | None = None,
 ) -> None:
     """Récupère toutes les alertes, affiche un résumé de scan puis chaque alerte."""
     alerts, stats = _scan_bucket_alerts(
-        bucket=bucket, prefix=prefix, region=region, profile_name=profile_name
+        bucket=bucket,
+        prefix=prefix,
+        region=region,
+        profile_name=profile_name,
+        credentials=credentials,
     )
     print(
         f"s3://{stats['bucket']}/{stats['prefix']} (region={stats['region']})",

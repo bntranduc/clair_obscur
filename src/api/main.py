@@ -14,6 +14,8 @@ load_dotenv(os.path.join(_REPO_ROOT, ".env"), override=False)
 
 from backend.aws.s3.logs import fetch_normalized_page  # noqa: E402
 from backend.analytics.siem import get_siem_dashboard  # noqa: E402
+from api.agentic_router import router as agentic_router  # noqa: E402
+from api.chat_router import router as chat_router  # noqa: E402
 
 API_V1 = "/api/v1"
 
@@ -25,6 +27,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(chat_router)
+app.include_router(agentic_router)
 
 
 @app.get("/")

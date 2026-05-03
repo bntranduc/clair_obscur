@@ -43,7 +43,7 @@ export default function AlertPreviewTrigger({ alert }: { alert: ModelAlert }) {
           e.stopPropagation();
           setOpen(true);
         }}
-        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.1] bg-white/[0.04] text-zinc-400 transition hover:border-cyan-500/35 hover:bg-cyan-500/10 hover:text-cyan-200"
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.1] bg-white/[0.04] text-zinc-400 transition hover:border-blue-500/35 hover:bg-blue-500/10 hover:text-blue-200"
         aria-label="Aperçu rapide de l’alerte"
         title="Aperçu rapide"
       >
@@ -110,7 +110,7 @@ export default function AlertPreviewTrigger({ alert }: { alert: ModelAlert }) {
                 <Link
                   href={`/dashboard/alertes/${encodeURIComponent(alert.challenge_id)}`}
                   onClick={close}
-                  className="text-[13px] font-medium text-cyan-400 hover:text-cyan-300"
+                  className="text-[13px] font-medium text-blue-400 hover:text-blue-300"
                 >
                   Ouvrir la fiche complète →
                 </Link>

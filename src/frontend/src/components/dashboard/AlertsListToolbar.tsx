@@ -20,7 +20,7 @@ export default function AlertsListToolbar({
         title="Grille"
         className={`rounded-lg p-2 transition ${
           mode === "grid"
-            ? "bg-white/[0.08] text-cyan-200 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.2)]"
+            ? "bg-white/[0.08] text-blue-200 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.22)]"
             : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
         }`}
       >
@@ -34,7 +34,7 @@ export default function AlertsListToolbar({
         title="Lignes"
         className={`rounded-lg p-2 transition ${
           mode === "row"
-            ? "bg-white/[0.08] text-cyan-200 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.2)]"
+            ? "bg-white/[0.08] text-blue-200 shadow-[inset_0_0_0_1px_rgba(59,130,246,0.22)]"
             : "text-zinc-500 hover:bg-white/[0.04] hover:text-zinc-300"
         }`}
       >

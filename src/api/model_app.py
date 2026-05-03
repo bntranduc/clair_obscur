@@ -1,4 +1,7 @@
-"""API modèle : événements normalisés → ``predict_alerts`` (Bedrock).
+"""API modèle : événements normalisés → ``predict_alerts`` (Bedrock uniquement).
+
+- **Avec** ``aws_credentials`` dans le corps : Bedrock avec ces identifiants pour cette requête.
+- **Sans** : Bedrock via ``AWS_PROFILE`` / rôle instance / variables d’environnement AWS.
 
 Expose aussi ``/api/v1/analytics/siem`` (même contrat que ``api.main``) pour que le
 dashboard fonctionne lorsque ``NEXT_PUBLIC_API_URL`` pointe vers cette instance (ex. port 8080).
@@ -12,7 +15,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 try:
     from dotenv import load_dotenv
@@ -23,6 +26,8 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if load_dotenv is not None:
     load_dotenv(os.path.join(_REPO_ROOT, ".env"), override=False)
 
+from api.agentic_router import router as agentic_router  # noqa: E402
+from api.chat_router import router as chat_router  # noqa: E402
 from backend.model.bedrock_client import MODEL_ID_DEFAULT
 from backend.model.predict import predict_alerts
 
@@ -36,10 +41,44 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(chat_router)
+app.include_router(agentic_router)
+
+
+class InlineAwsCredentials(BaseModel):
+    """Identifiants AWS pour un seul ``POST /predict`` → appel Bedrock (STS recommandé).
+
+    À utiliser avec parcimonie : tout secret dans le corps d’une requête peut fuiter (logs applicatifs,
+    reverse proxy, traces APM). Préférer un rôle IAM sur l’instance lorsque Bedrock est joignable.
+    """
+
+    aws_access_key_id: str = Field(..., min_length=8)
+    aws_secret_access_key: str = Field(..., min_length=8)
+    aws_session_token: str | None = Field(
+        default=None,
+        description="Requis pour les sessions temporaires STS.",
+        min_length=4,
+    )
+    region: str | None = Field(
+        default=None,
+        min_length=3,
+        description="Si renseigné : région AWS pour cet appel Bedrock (remplace AWS_REGION pour cette requête).",
+    )
+
+    @field_validator("aws_session_token", mode="before")
+    @classmethod
+    def empty_token_to_none(cls, v: object) -> object:
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
 
 class PredictRequest(BaseModel):
     events: list[dict[str, Any]] = Field(..., min_length=1)
+    aws_credentials: InlineAwsCredentials | None = Field(
+        default=None,
+        description="Optionnel : Bedrock avec ces identifiants pour cette requête ; sinon identifiants ambiant (profil / rôle).",
+    )
 
 
 class PredictResponse(BaseModel):
@@ -54,16 +93,26 @@ def health() -> dict[str, str]:
 @app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest) -> PredictResponse:
     region = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "eu-west-3"))
+    if req.aws_credentials and req.aws_credentials.region:
+        region = (req.aws_credentials.region or "").strip() or region
     mid = (os.getenv("BEDROCK_MODEL_ID") or "").strip() or MODEL_ID_DEFAULT
     max_tokens = int(os.getenv("BEDROCK_MAX_TOKENS", "4096"))
     prof = (os.getenv("AWS_PROFILE") or "").strip() or None
+
+    inline_creds: dict[str, str] | None = None
+    if req.aws_credentials is not None:
+        d = req.aws_credentials.model_dump()
+        d.pop("region", None)
+        inline_creds = {k: str(v) for k, v in d.items() if v is not None}
+
     try:
         alerts = predict_alerts(
             req.events,
             region=region,
             model_id=mid,
             max_tokens=max_tokens,
-            profile_name=prof,
+            profile_name=None if inline_creds else prof,
+            inline_aws_credentials=inline_creds,
         )
     except (json.JSONDecodeError, ValueError):
         return PredictResponse(alerts=[])

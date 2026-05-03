@@ -1,0 +1,1 @@
+"""Utilitaires texte, chemins, erreurs."""

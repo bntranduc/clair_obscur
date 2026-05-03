@@ -29,7 +29,7 @@ import {
 import { fetchSiemAnalytics } from "@/lib/api";
 import type { SiemDashboard, SiemKeyCount } from "@/types/siemAnalytics";
 
-const PIE_COLORS = ["#22d3ee", "#a78bfa", "#fbbf24", "#4ade80", "#f472b6", "#94a3b8"];
+const PIE_COLORS = ["#3b82f6", "#ef4444", "#fbbf24", "#4ade80", "#f97316", "#94a3b8"];
 const TOOLTIP_STYLE = {
   borderRadius: 8,
   border: "1px solid rgba(255,255,255,0.1)",
@@ -65,21 +65,21 @@ function KpiCard({
   label: string;
   value: string;
   sub?: string;
-  accent: "cyan" | "violet" | "amber" | "emerald";
+  accent: "blue" | "red" | "amber" | "emerald";
 }) {
   const ring =
-    accent === "cyan"
-      ? "ring-cyan-500/20"
-      : accent === "violet"
-        ? "ring-violet-500/20"
+    accent === "blue"
+      ? "ring-blue-500/20"
+      : accent === "red"
+        ? "ring-red-500/20"
         : accent === "amber"
           ? "ring-amber-500/20"
           : "ring-emerald-500/20";
   const glow =
-    accent === "cyan"
-      ? "from-cyan-500/10"
-      : accent === "violet"
-        ? "from-violet-500/10"
+    accent === "blue"
+      ? "from-blue-500/10"
+      : accent === "red"
+        ? "from-red-500/10"
         : accent === "amber"
           ? "from-amber-500/10"
           : "from-emerald-500/10";
@@ -180,7 +180,7 @@ export default function SiemAnalyticsDashboard() {
   if (loading && !data) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-zinc-500">
-        <Loader2 className="h-8 w-8 animate-spin text-cyan-500/80" aria-hidden />
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500/80" aria-hidden />
         <p className="text-sm">Chargement des métriques SIEM…</p>
       </div>
     );
@@ -232,7 +232,7 @@ export default function SiemAnalyticsDashboard() {
               setLoading(true);
               load();
             }}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-[12px] font-medium text-zinc-300 transition hover:border-cyan-500/30 hover:text-white"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-2 text-[12px] font-medium text-zinc-300 transition hover:border-blue-500/30 hover:text-white"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} aria-hidden />
             Actualiser
@@ -246,14 +246,14 @@ export default function SiemAnalyticsDashboard() {
           label="Volume (fenêtre)"
           value={formatInt(data.total_events)}
           sub={`${data.time_range_hours} h glissantes`}
-          accent="cyan"
+          accent="blue"
         />
         <KpiCard
           icon={<Radio size={20} />}
           label="Débit moyen"
           value={data.events_per_minute_avg.toFixed(2)}
           sub="événements / minute"
-          accent="violet"
+          accent="red"
         />
         <KpiCard
           icon={<Users size={20} />}
@@ -285,8 +285,8 @@ export default function SiemAnalyticsDashboard() {
             <AreaChart data={timelineChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="siemArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
@@ -311,7 +311,7 @@ export default function SiemAnalyticsDashboard() {
               <Area
                 type="monotone"
                 dataKey="count"
-                stroke="#22d3ee"
+                stroke="#3b82f6"
                 strokeWidth={2}
                 fill="url(#siemArea)"
                 animationDuration={600}
@@ -368,7 +368,7 @@ export default function SiemAnalyticsDashboard() {
                   contentStyle={{ background: "#09090b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8 }}
                   formatter={(v) => formatInt(Number(v ?? 0))}
                 />
-                <Bar dataKey="count" fill="#a78bfa" radius={[0, 6, 6, 0]} animationDuration={600} />
+                <Bar dataKey="count" fill="#ef4444" radius={[0, 6, 6, 0]} animationDuration={600} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -377,7 +377,7 @@ export default function SiemAnalyticsDashboard() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Panel title="Actions pare-feu" subtitle="Accept / reject / drop sur les événements réseau">
-          <HorizontalBars rows={data.network_actions} color="#22d3ee" />
+          <HorizontalBars rows={data.network_actions} color="#3b82f6" />
         </Panel>
         <Panel title="Authentification" subtitle="Succès vs échecs (logs auth)">
           <HorizontalBars rows={data.auth_by_status} color="#4ade80" />
@@ -392,7 +392,7 @@ export default function SiemAnalyticsDashboard() {
                 key={row.ip}
                 className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-black/20 px-3 py-2 font-mono text-[12px]"
               >
-                <span className="truncate text-cyan-200/90">{row.ip}</span>
+                <span className="truncate text-blue-200/90">{row.ip}</span>
                 <span className="shrink-0 tabular-nums text-zinc-400">{formatInt(row.count)}</span>
               </li>
             ))}
