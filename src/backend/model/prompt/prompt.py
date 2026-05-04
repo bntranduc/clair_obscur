@@ -9,17 +9,28 @@ PREDICTION_PROMPT_TEMPLATE = """You are a SOC analyst assistant. Below are aggre
 
 IMPORTANT: If the aggregated incidents list is empty OR if you conclude there is no attack, DO NOT invent anything. In that case, return an EMPTY response (no JSON, no text).
 
-You must return a LIST of detections (JSON array). Include one detection per distinct attack type you believe is present (you may return 1..N items).
+You must return a LIST of detections (JSON array). Include one detection per distinct attack campaign you believe is present (you may return 1..N items).
 
 Each detection.detection.attack_type MUST be exactly one value from this closed list (copy the string verbatim):
 {types_list}
 
-If signals conflict, include multiple detections if justified (e.g., SSH brute force AND credential stuffing).
+ATTACK GROUPING — MANDATORY:
+Multiple rule_ids that belong to the same attack campaign MUST be merged into a single detection. Use the following mapping to decide which rule_ids belong together:
+- attack_type=ssh_brute_force: SSH_BRUTEFORCE, SSH_BRUTEFORCE_SSH_ONLY, SSH_PRIV_ESC, SSH_LATERAL_MOVE, SSH_EXFIL, SUSPICIOUS_GEO (when correlated with SSH signals)
+- attack_type=credential_stuffing: CREDENTIAL_STUFFING, CREDENTIAL_STUFFING_USER_TARGETED, CREDENTIAL_STUFFING_SUCCESS
+- attack_type=sql_injection: SQL_INJECTION, WEB_SQLI_AUTOMATED, SQL_INJECTION_MANY_500, SQL_INJECTION_EXFIL, SQL_INJECTION_SQLMAP_UA
+- attack_type=directory_traversal: DIRECTORY_TRAVERSAL, DIRECTORY_TRAVERSAL_SUCCESS
+- attack_type=ssrf: SSRF
+- attack_type=exfiltration: NET_REVERSE_SHELL, SSH_EXFIL, SYS_EXFIL_TOOL, KILL_CHAIN_SHELL_TO_EXFIL (use exfiltration only when it is the PRIMARY behavior, not a side-effect of ssh_brute_force or sql_injection)
+KILL_CHAIN_* rules (KILL_CHAIN_RECON_TO_EXPLOIT, KILL_CHAIN_PERSISTENCE, KILL_CHAIN_COMPROMISE_AND_COVER, KILL_CHAIN_WEBBRUTEFORCE_TO_EXPLOIT, KILL_CHAIN_WEBSCAN_TO_EXPLOIT) are correlation signals — they confirm other detections but do NOT create additional detections.
+WEB_BRUTEFORCE_HTTP, WEB_BRUTEFORCE_HTTP_UA, WEB_BRUTEFORCE_HTTP_SUCCESS, WEB_DIR_BRUTEFORCE, WEB_NIKTO_SCAN, NET_PORT_SCAN, NET_PORT_SCAN_BURST, NET_NMAP_USERAGENT, WEB_IDOR: consolidate these into the most relevant attack_type they lead to (e.g., brute force leading to web_shell → ssh_brute_force or credential_stuffing; scanning + sqli → sql_injection).
+
+Only emit multiple detections when there are genuinely distinct attack types from different campaigns (e.g., an SSH brute force campaign AND a separate SQL injection campaign).
 
 Return ONLY valid JSON (no markdown, no commentary) with exactly this shape:
 [
   {{
-    "challenge_id": "<string; use the same value as detection.attack_type unless the dataset defines another id>",
+    "challenge_id": "<string: the initial intrusion vector — MUST match detection.attack_type (e.g. 'credential_stuffing', 'ssh_brute_force'). Use the attack_type that represents how the attacker FIRST gained access, not post-compromise actions like persistence or exfiltration>",
     "severity": "<exactly one of: low | medium | high | critical — standard SIEM-style urgency>",
     "alert_summary": "<string: short executive summary for alert queues and dashboards (1–3 sentences, plain text)>",
     "detection": {{
@@ -71,8 +82,13 @@ Reference examples (illustrative JSON only — IPs and text are fictional; your 
 {examples_blob}
 
 Rules:
-- attacker_ips: derive from incident source_ip fields when present; omit empty strings.
-- victim_accounts: usernames that appear targeted (e.g. stuffing per-user); omit generic noise if unsure.
+- challenge_id: MUST equal the initial intrusion vector (same value as detection.attack_type). Choose the attack_type that represents how the attacker first gained access — post-compromise actions (persistence, exfiltration, lateral movement) are context, not the vector.
+- attacker_ips: derive from incident source_ip fields when present; omit empty strings. IMPORTANT: do NOT list internal/private IPs (10.x.x.x, 172.16–31.x.x, 192.168.x.x) as attacker_ips — these are victim machines or internal infrastructure. Exception: for NET_REVERSE_SHELL incidents, source_ip is the compromised internal host beaconing outward; use indicators.destination_ip as the attacker C2 address instead.
+- victim_accounts: ONLY include accounts where the attack SUCCEEDED. Specifically:
+  • CREDENTIAL_STUFFING_SUCCESS → use indicators.compromised_usernames
+  • SSH_PRIV_ESC → use the username field (privilege escalation confirms access)
+  • WEB_BRUTEFORCE_HTTP_SUCCESS → use context from the success signal
+  • If no success signal exists (attack was attempted but blocked/failed), use [].
 - Timestamps: merge overlapping incidents; if unclear use the widest reasonable span from the incidents or empty-window fallback "1970-01-01T00:00:00Z".
 - indicators: compact dict summarizing key signals (rule_ids, counts, distinct_usernames, etc.).
 - severity: MUST be one of low, medium, high, critical (lowercase English tokens). Map impact and likelihood to the tier used in your SOC (e.g. widespread exfiltration or critical asset → high/critical).
