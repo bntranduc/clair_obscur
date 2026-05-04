@@ -7,7 +7,8 @@ from backend.agentic.agent.session import Session
 from backend.agentic.client.response import StreamEventType, TokenUsage, ToolCall, ToolResultMessage
 from backend.agentic.config.config import Config
 from backend.agentic.prompts.system import create_loop_breaker_prompt
-from backend.agentic.tools.base import ToolConfirmation
+from backend.agentic.tools.base import ToolConfirmation, ToolInvocation, ToolResult
+from backend.agentic.tools.subagents import SubagentTool
 
 
 class Agent:
@@ -156,14 +157,65 @@ class Agent:
                     args=tool_call.arguments,
                 )
 
-                result = await self.session.tool_registry.invoke(
-                    tool_call.name,
-                    tool_call.arguments,
-                    self.config.cwd,
-                    self.session.hook_system,
-                    self.session.approval_manager,
-                    planning_context=self.session.last_planning_text,
-                )
+                tool_obj = self.session.tool_registry.get(tool_call.name)
+                if isinstance(tool_obj, SubagentTool):
+                    val_err = tool_obj.validate_params(tool_call.arguments)
+                    if val_err:
+                        result = ToolResult.error_result(
+                            f"Invalid parameters: {'; '.join(val_err)}",
+                            metadata={
+                                "tool_name": tool_call.name,
+                                "validation_errors": val_err,
+                            },
+                        )
+                        await self.session.hook_system.trigger_after_tool(
+                            tool_call.name,
+                            tool_call.arguments,
+                            result,
+                        )
+                    else:
+                        await self.session.hook_system.trigger_before_tool(
+                            tool_call.name,
+                            tool_call.arguments,
+                        )
+                        invocation = ToolInvocation(
+                            params=tool_call.arguments,
+                            cwd=self.config.cwd,
+                        )
+                        result: ToolResult | None = None
+                        try:
+                            async for kind, payload in tool_obj.stream_execute(
+                                invocation,
+                                parent_tool_call_id=tool_call.call_id,
+                            ):
+                                if kind == "forward":
+                                    yield payload
+                                else:
+                                    result = payload
+                        except Exception as e:  # noqa: BLE001
+                            result = ToolResult.error_result(
+                                f"Sub-agent stream failed: {e}",
+                                metadata={"tool_name": tool_call.name},
+                            )
+                        if result is None:
+                            result = ToolResult.error_result(
+                                "Sub-agent produced no result",
+                                metadata={"tool_name": tool_call.name},
+                            )
+                        await self.session.hook_system.trigger_after_tool(
+                            tool_call.name,
+                            tool_call.arguments,
+                            result,
+                        )
+                else:
+                    result = await self.session.tool_registry.invoke(
+                        tool_call.name,
+                        tool_call.arguments,
+                        self.config.cwd,
+                        self.session.hook_system,
+                        self.session.approval_manager,
+                        planning_context=self.session.last_planning_text,
+                    )
 
                 yield AgentEvent.tool_call_complete(
                     tool_call.call_id,

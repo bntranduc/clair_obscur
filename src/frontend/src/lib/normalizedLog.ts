@@ -8,6 +8,8 @@ export type RawRef = {
 };
 
 export type NormalizedEvent = {
+  /** Présent quand la source est DynamoDB (ingestion ``put_logs_from_s3_to_dynamo_db``). */
+  id?: string | null;
   raw_ref?: RawRef;
   timestamp?: string | null;
   log_source?: string | null;
@@ -46,6 +48,7 @@ export type NormalizedEvent = {
 
 /** Colonnes du tableau (ordre = types.py ``NormalizedEvent``). */
 export const NORMALIZED_TABLE_COLUMNS: { label: string; path: string[] }[] = [
+  { label: "id", path: ["id"] },
   { label: "raw_id", path: ["raw_ref", "raw_id"] },
   { label: "s3_key", path: ["raw_ref", "s3_key"] },
   { label: "line", path: ["raw_ref", "line"] },

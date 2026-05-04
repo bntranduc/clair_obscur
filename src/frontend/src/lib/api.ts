@@ -24,6 +24,56 @@ export type NormalizedLogsPage = {
   limit: number;
 };
 
+/** Pagination par curseur (DynamoDB) — pas de clés AWS dans l’URL. */
+export type NormalizedLogsDynamoPage = {
+  items: NormalizedEvent[];
+  has_more: boolean;
+  next_start_key: string | null;
+  limit: number;
+  pk: string;
+};
+
+export type FetchNormalizedLogsDynamoOptions = {
+  pk?: string;
+  region?: string;
+};
+
+/** Partition DynamoDB côté navigateur (build Next) — même rôle que ``DYNAMODB_PK`` dans ``test.py``. */
+function dynamoPkFromEnv(): string | undefined {
+  if (typeof process === "undefined" || !process.env?.NEXT_PUBLIC_DYNAMODB_PK) return undefined;
+  const v = process.env.NEXT_PUBLIC_DYNAMODB_PK.trim();
+  return v || undefined;
+}
+
+export async function fetchNormalizedLogsFromDynamodb(
+  params: { limit?: number; start_key?: string | null },
+  options?: FetchNormalizedLogsDynamoOptions,
+): Promise<NormalizedLogsDynamoPage> {
+  const sp = new URLSearchParams();
+  sp.set("limit", String(params.limit ?? 50));
+  if (params.start_key?.trim()) sp.set("start_key", params.start_key.trim());
+  const pk = options?.pk?.trim() || dynamoPkFromEnv();
+  if (pk) sp.set("pk", pk);
+  if (options?.region?.trim()) sp.set("region", options.region.trim());
+  const q = sp.toString();
+  const url = `${getApiUrl()}/api/v1/logs/dynamodb${q ? `?${q}` : ""}`;
+  const res = await fetch(url, apiFetchInit);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let detail = text;
+    try {
+      const j = JSON.parse(text) as { detail?: unknown };
+      if (typeof j.detail === "string") detail = j.detail;
+      else if (Array.isArray(j.detail))
+        detail = j.detail.map((x: unknown) => (typeof x === "string" ? x : JSON.stringify(x))).join("; ");
+    } catch {
+      /* keep raw */
+    }
+    throw new Error(`GET /api/v1/logs/dynamodb failed (${res.status}): ${String(detail).slice(0, 800)}`.trim());
+  }
+  return (await res.json()) as NormalizedLogsDynamoPage;
+}
+
 export async function fetchNormalizedLogs(
   params: { skip?: number; limit?: number },
   options?: FetchNormalizedLogsOptions,
@@ -54,12 +104,63 @@ export async function fetchNormalizedLogs(
   return (await res.json()) as NormalizedLogsPage;
 }
 
-export async function fetchSiemAnalytics(hours: number = 24): Promise<SiemDashboard> {
-  const url = `${getApiUrl()}/api/v1/analytics/siem?hours=${encodeURIComponent(String(hours))}`;
+export type FetchSiemAnalyticsOptions = {
+  since?: string;
+  until?: string;
+};
+
+export async function fetchSiemAnalytics(hours: number = 24, options?: FetchSiemAnalyticsOptions): Promise<SiemDashboard> {
+  const sp = new URLSearchParams();
+  sp.set("hours", String(hours));
+  const since = options?.since?.trim();
+  const until = options?.until?.trim();
+  if (since) sp.set("since", since);
+  if (until) sp.set("until", until);
+  const q = sp.toString();
+  const url = `${getApiUrl()}/api/v1/analytics/siem?${q}`;
   const res = await fetch(url, apiFetchInit);
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`GET /api/v1/analytics/siem failed (${res.status}) ${text}`.trim());
+  }
+  const j = (await res.json()) as SiemDashboard & { geo_logs?: SiemDashboard["geo_logs"] };
+  return { ...j, geo_logs: Array.isArray(j.geo_logs) ? j.geo_logs : [] };
+}
+
+export type FetchDynamodbAnalyticsOptions = {
+  pk?: string;
+  region?: string;
+  since?: string;
+  until?: string;
+};
+
+/** Agrégations sur un échantillon DynamoDB (même ``pk`` / env que les logs). */
+export async function fetchDynamodbAnalytics(
+  maxItems: number = 8000,
+  options?: FetchDynamodbAnalyticsOptions,
+): Promise<SiemDashboard> {
+  const sp = new URLSearchParams();
+  sp.set("max_items", String(maxItems));
+  const pk = options?.pk?.trim() || dynamoPkFromEnv();
+  if (pk) sp.set("pk", pk);
+  if (options?.region?.trim()) sp.set("region", options.region.trim());
+  const since = options?.since?.trim();
+  const until = options?.until?.trim();
+  if (since) sp.set("since", since);
+  if (until) sp.set("until", until);
+  const q = sp.toString();
+  const url = `${getApiUrl()}/api/v1/analytics/dynamodb${q ? `?${q}` : ""}`;
+  const res = await fetch(url, apiFetchInit);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let detail = text;
+    try {
+      const j = JSON.parse(text) as { detail?: unknown };
+      if (typeof j.detail === "string") detail = j.detail;
+    } catch {
+      /* keep raw */
+    }
+    throw new Error(`GET /api/v1/analytics/dynamodb failed (${res.status}): ${String(detail).slice(0, 800)}`.trim());
   }
   const j = (await res.json()) as SiemDashboard & { geo_logs?: SiemDashboard["geo_logs"] };
   return { ...j, geo_logs: Array.isArray(j.geo_logs) ? j.geo_logs : [] };

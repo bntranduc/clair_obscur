@@ -15,6 +15,7 @@ from backend.agentic.tools.clair_log_classifier import ClassifyFirewallLogTool
 from backend.agentic.tools.logs_table_sql import BuildSqlForLogsTableTool, RunSqlOnLogsTableTool
 from backend.agentic.tools.s3_normalized_logs import FetchNormalizedLogsFromS3Tool
 from backend.agentic.tools.subagents import SubagentTool, get_logs_pipeline_subagent_definitions
+from backend.agentic.tools.remediation_subagent import get_remediation_subagent_definitions
 from backend.agentic.tools.visualization import VisualizationFromPromptTool, get_visualization_subagent_definitions
 
 logger = logging.getLogger(__name__)
@@ -194,6 +195,7 @@ def create_default_registry(config: Config) -> ToolRegistry:
     - Pipeline logs S3 → SQL : ``fetch_normalized_logs_from_s3``, ``build_sql_for_logs_table``,
       ``run_sql_on_logs_table``, sous-agents ``subagent_s3_normalized_logs`` et ``subagent_logs_table_sql``.
     - Visualisation : ``visualization_from_prompt``, sous-agent ``subagent_visualization_specialist``.
+    - Remédiation IR : ``subagent_remediation_soc`` (plan contain/eradicate/recover, outils lecture).
     """
     registry = ToolRegistry(config)
     registry.register(ClassifyFirewallLogTool(config))
@@ -204,5 +206,7 @@ def create_default_registry(config: Config) -> ToolRegistry:
     for sub_def in get_logs_pipeline_subagent_definitions():
         registry.register(SubagentTool(config, sub_def))
     for sub_def in get_visualization_subagent_definitions():
+        registry.register(SubagentTool(config, sub_def))
+    for sub_def in get_remediation_subagent_definitions():
         registry.register(SubagentTool(config, sub_def))
     return registry

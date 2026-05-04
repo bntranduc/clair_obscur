@@ -39,12 +39,17 @@ type ToolSegment = {
   truncated?: boolean;
   /** Métadonnées outil (ex. ``chart`` pour visualization_from_prompt → Recharts). */
   metadata?: Record<string, unknown>;
+  /** Présent si l’outil est invoqué depuis un sous-agent (streaming relayé). */
+  subagent?: string;
+  parentToolCallId?: string;
 };
 
 type TextSegment = {
   kind: 'text';
   content: string;
   streaming: boolean;
+  /** Réponse texte du sous-agent (distincte du modèle principal). */
+  subagent?: string;
 };
 
 /** Plan / résumé (ex. ``reasoning.summary`` OpenRouter) — bloc distinct style Cursor. */
@@ -53,12 +58,15 @@ type PlanningSegment = {
   content: string;
   streaming: boolean;
   turn?: number;
+  /** Flux planning d’un sous-agent (ex. remediation_soc). */
+  subagent?: string;
 };
 
 type PlanningArchiveSegment = {
   kind: 'planning_archive';
   content: string;
   turn: number;
+  subagent?: string;
 };
 
 type ReasoningSegment = {
@@ -67,6 +75,7 @@ type ReasoningSegment = {
   streaming: boolean;
   /** Tour d’appel LLM (aligné sur `agent_step` phase llm). */
   turn?: number;
+  subagent?: string;
 };
 
 /** Réflexion terminée d’un tour précédent — affichage repliable (style Cursor). */
@@ -74,6 +83,7 @@ type ReasoningArchiveSegment = {
   kind: 'reasoning_archive';
   content: string;
   turn: number;
+  subagent?: string;
 };
 
 type StepSegment = {
@@ -262,6 +272,7 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
               kind: 'reasoning_archive',
               content: s.content,
               turn: s.turn ?? turn - 1,
+              subagent: s.subagent,
             };
             break;
           }
@@ -273,6 +284,7 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
               kind: 'planning_archive',
               content: s.content,
               turn: s.turn ?? turn - 1,
+              subagent: s.subagent,
             };
             break;
           }
@@ -285,8 +297,13 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
 
     if (type === 'planning_delta' && typeof data.content === 'string') {
       const turn = lastLlmTurn();
+      const sub = typeof data.subagent === 'string' ? data.subagent : undefined;
       const last = draft.segments[draft.segments.length - 1];
-      if (last?.kind === 'planning' && last.streaming) {
+      const sameStream =
+        last?.kind === 'planning' &&
+        last.streaming &&
+        (sub === undefined ? last.subagent === undefined : last.subagent === sub);
+      if (sameStream) {
         last.content += data.content;
       } else {
         draft.segments.push({
@@ -294,6 +311,7 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
           content: data.content,
           streaming: true,
           turn,
+          subagent: sub,
         });
       }
       return;
@@ -301,9 +319,11 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
 
     if (type === 'planning_complete') {
       const full = typeof data.content === 'string' ? data.content : undefined;
+      const sub = typeof data.subagent === 'string' ? data.subagent : undefined;
       let pIdx = -1;
       for (let i = draft.segments.length - 1; i >= 0; i--) {
-        if (draft.segments[i].kind === 'planning') {
+        const seg = draft.segments[i];
+        if (seg.kind === 'planning' && (sub === undefined ? seg.subagent === undefined : seg.subagent === sub)) {
           pIdx = i;
           break;
         }
@@ -320,6 +340,7 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
           content: full,
           streaming: false,
           turn: lastLlmTurn(),
+          subagent: sub,
         });
       }
       return;
@@ -327,8 +348,13 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
 
     if (type === 'reasoning_delta' && typeof data.content === 'string') {
       const turn = lastLlmTurn();
+      const sub = typeof data.subagent === 'string' ? data.subagent : undefined;
       const last = draft.segments[draft.segments.length - 1];
-      if (last?.kind === 'reasoning' && last.streaming) {
+      const sameStream =
+        last?.kind === 'reasoning' &&
+        last.streaming &&
+        (sub === undefined ? last.subagent === undefined : last.subagent === sub);
+      if (sameStream) {
         last.content += data.content;
       } else {
         draft.segments.push({
@@ -336,6 +362,7 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
           content: data.content,
           streaming: true,
           turn,
+          subagent: sub,
         });
       }
       return;
@@ -344,9 +371,11 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
     if (type === 'reasoning_complete') {
       const full =
         typeof data.content === 'string' ? data.content : undefined;
+      const sub = typeof data.subagent === 'string' ? data.subagent : undefined;
       let reasoningIdx = -1;
       for (let i = draft.segments.length - 1; i >= 0; i--) {
-        if (draft.segments[i].kind === 'reasoning') {
+        const seg = draft.segments[i];
+        if (seg.kind === 'reasoning' && (sub === undefined ? seg.subagent === undefined : seg.subagent === sub)) {
           reasoningIdx = i;
           break;
         }
@@ -363,28 +392,49 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
           content: full,
           streaming: false,
           turn: lastLlmTurn(),
+          subagent: sub,
         });
       }
       return;
     }
 
     if (type === 'text_delta' && typeof data.content === 'string') {
+      const sub = typeof data.subagent === 'string' ? data.subagent : undefined;
       const last = draft.segments[draft.segments.length - 1];
-      if (last?.kind === 'text' && last.streaming) {
+      const sameStream =
+        last?.kind === 'text' &&
+        last.streaming &&
+        (sub === undefined ? last.subagent === undefined : last.subagent === sub);
+      if (sameStream) {
         last.content += data.content;
       } else {
-        draft.segments.push({ kind: 'text', content: data.content, streaming: true });
+        draft.segments.push({
+          kind: 'text',
+          content: data.content,
+          streaming: true,
+          subagent: sub,
+        });
       }
       return;
     }
 
     if (type === 'text_complete' && typeof data.content === 'string') {
+      const sub = typeof data.subagent === 'string' ? data.subagent : undefined;
       const last = draft.segments[draft.segments.length - 1];
-      if (last?.kind === 'text' && last.streaming) {
+      const sameStream =
+        last?.kind === 'text' &&
+        last.streaming &&
+        (sub === undefined ? last.subagent === undefined : last.subagent === sub);
+      if (sameStream) {
         last.content = data.content;
         last.streaming = false;
       } else {
-        draft.segments.push({ kind: 'text', content: data.content, streaming: false });
+        draft.segments.push({
+          kind: 'text',
+          content: data.content,
+          streaming: false,
+          subagent: sub,
+        });
       }
       return;
     }
@@ -396,6 +446,9 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
         name: String(data.name ?? ''),
         arguments: (data.arguments as Record<string, unknown>) ?? {},
         pending: true,
+        subagent: typeof data.subagent === 'string' ? data.subagent : undefined,
+        parentToolCallId:
+          typeof data.parent_tool_call_id === 'string' ? data.parent_tool_call_id : undefined,
       });
       return;
     }
@@ -811,10 +864,10 @@ function isTextSegment(seg: RunSegment): seg is TextSegment {
   return seg.kind === 'text';
 }
 
-/** Segments hors réponse finale affichée à l’utilisateur (planning, reasoning, outils, étapes tools). */
+/** Segments hors réponse finale du modèle principal (inclut planning/reasoning/outils + texte sous-agent). */
 function reflectionSegmentCount(segments: RunSegment[]): number {
   return segments.filter((s) => {
-    if (isTextSegment(s)) return false;
+    if (isTextSegment(s) && !s.subagent) return false;
     if (s.kind === 'step' && s.phase === 'llm') return false;
     return true;
   }).length;
@@ -835,6 +888,16 @@ function chartPayloadsFromRun(
 
 function RunSegmentBlock({ seg, j }: { seg: RunSegment; j: number }) {
   if (seg.kind === 'text') {
+    if (seg.subagent) {
+      return (
+        <div className="rounded-2xl rounded-bl-md px-4 py-3 text-sm bg-violet-950/25 border border-violet-500/25 text-gray-200">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-300/90 mb-2">
+            Sous-agent · {seg.subagent}
+          </p>
+          <MarkdownMessage content={seg.content} streaming={seg.streaming} />
+        </div>
+      );
+    }
     return (
       <div className="rounded-2xl rounded-bl-md px-4 py-3 text-sm bg-white/5 border border-white/10 text-gray-200">
         <MarkdownMessage content={seg.content} streaming={seg.streaming} />
@@ -961,7 +1024,10 @@ function PlanningArchiveCard({ segment }: { segment: PlanningArchiveSegment }) {
       >
         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         <ListTree size={12} className="text-blue-500/80 shrink-0" />
-        <span>Planning précédent · tour {segment.turn ?? '—'}</span>
+        <span>
+          Planning précédent · tour {segment.turn ?? '—'}
+          {segment.subagent ? ` · ${segment.subagent}` : ''}
+        </span>
       </button>
       {open && (
         <div className="px-3 pb-2">
@@ -986,9 +1052,14 @@ function PlanningCard({ segment }: { segment: PlanningSegment }) {
   return (
     <div className="rounded-xl border border-blue-500/35 bg-gradient-to-b from-blue-950/35 to-black/20 overflow-hidden text-sm">
       <div className="px-3 pt-3 pb-2 border-b border-white/5">
-        <div className="text-[13px] font-medium text-slate-100/95 flex items-center gap-2">
+        <div className="text-[13px] font-medium text-slate-100/95 flex items-center gap-2 flex-wrap">
           <ListTree size={15} className="text-blue-400 shrink-0" />
           <span>Planning</span>
+          {segment.subagent ? (
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-violet-300/95 px-2 py-0.5 rounded-md bg-violet-500/15 border border-violet-500/25">
+              sous-agent · {segment.subagent}
+            </span>
+          ) : null}
           {segment.streaming && (
             <Loader2 size={14} className="animate-spin text-blue-400/85 ml-auto shrink-0" />
           )}
@@ -1032,7 +1103,10 @@ function ReasoningArchiveCard({ segment }: { segment: ReasoningArchiveSegment })
       >
         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         <Brain size={12} className="text-slate-500 shrink-0" />
-        <span>Réflexion précédente · tour {segment.turn ?? '—'}</span>
+        <span>
+          Réflexion précédente · tour {segment.turn ?? '—'}
+          {segment.subagent ? ` · ${segment.subagent}` : ''}
+        </span>
       </button>
       {open && (
         <div className="px-3 pb-2">
@@ -1059,9 +1133,11 @@ function ReasoningCard({ segment }: { segment: ReasoningSegment }) {
   return (
     <div className="rounded-xl border border-cyan-500/25 bg-gradient-to-b from-cyan-950/30 to-black/20 overflow-hidden text-sm">
       <div className="px-3 pt-3 pb-2 border-b border-white/5 space-y-2">
-        <div className="text-[13px] font-medium text-slate-200/95 flex items-center gap-2">
+        <div className="text-[13px] font-medium text-slate-200/95 flex items-center gap-2 flex-wrap">
           <Brain size={15} className="text-cyan-400 shrink-0" />
-          <span className="text-slate-300">Exploring</span>
+          <span className="text-slate-300">
+            Exploring{segment.subagent ? ` · ${segment.subagent}` : ''}
+          </span>
           {segment.streaming && (
             <Loader2 size={14} className="animate-spin text-cyan-400/80 ml-auto shrink-0" />
           )}
@@ -1112,6 +1188,11 @@ function ToolCard({ tool }: { tool: ToolSegment }) {
         {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         <Wrench size={14} className="text-amber-400 shrink-0" />
         <span className="font-medium">{tool.name || 'tool'}</span>
+        {tool.subagent ? (
+          <span className="text-[10px] font-medium text-violet-300/90 px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20 shrink-0">
+            via {tool.subagent}
+          </span>
+        ) : null}
         {tool.pending ? (
           <Loader2 size={14} className="animate-spin text-amber-400 ml-auto" />
         ) : tool.success ? (

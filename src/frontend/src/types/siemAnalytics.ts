@@ -29,5 +29,12 @@ export type SiemDashboard = {
   system_by_severity: SiemKeyCount[];
   /** Échantillon de logs géolocalisés (OpenSearch ou démo). */
   geo_logs: SiemGeoLogPoint[];
-  data_source: "opensearch" | "demo";
+  data_source: "opensearch" | "demo" | "dynamodb";
+  /** Renseigné quand ``data_source === "dynamodb"``. */
+  dynamodb_pk?: string;
+  dynamodb_items_scanned?: number;
+  dynamodb_truncated?: boolean;
+  /** Fenêtre explicite si l’API a reçu ``since`` + ``until``. */
+  time_filter_since?: string | null;
+  time_filter_until?: string | null;
 };

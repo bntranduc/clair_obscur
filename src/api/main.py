@@ -1,8 +1,9 @@
-"""API HTTP minimale : logs normalisés depuis S3 (voir ``backend.aws.s3.logs``)."""
+"""API HTTP : logs normalisés depuis S3 ou DynamoDB (voir ``backend.aws``)."""
 
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from typing import Any
 
 from dotenv import load_dotenv
@@ -13,12 +14,39 @@ from botocore.exceptions import BotoCoreError, ClientError
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 load_dotenv(os.path.join(_REPO_ROOT, ".env"), override=False)
 
+from backend.aws.dynamodb_normalized_logs import (  # noqa: E402
+    default_logs_partition_key,
+    fetch_normalized_page_from_dynamodb,
+)
 from backend.aws.s3.logs import fetch_normalized_page  # noqa: E402
+from backend.analytics.dynamodb_dashboard import get_dynamodb_dashboard  # noqa: E402
 from backend.analytics.siem import get_siem_dashboard  # noqa: E402
 from api.agentic_router import router as agentic_router  # noqa: E402
 from api.chat_router import router as chat_router  # noqa: E402
 
 API_V1 = "/api/v1"
+
+
+def _analytics_time_bounds(since: str | None, until: str | None) -> tuple[str | None, str | None]:
+    """``since`` / ``until`` : paire obligatoire si l’un est renseigné ; ISO 8601 ; ``since`` ≤ ``until``."""
+    s_raw = (since or "").strip()
+    u_raw = (until or "").strip()
+    if bool(s_raw) ^ bool(u_raw):
+        raise HTTPException(
+            status_code=400,
+            detail="Les paramètres « since » et « until » doivent être fournis ensemble ou absents tous les deux.",
+        )
+    if not s_raw:
+        return None, None
+    try:
+        ds = datetime.fromisoformat(s_raw.replace("Z", "+00:00"))
+        du = datetime.fromisoformat(u_raw.replace("Z", "+00:00"))
+    except (TypeError, ValueError, OSError) as e:
+        raise HTTPException(status_code=400, detail="« since » ou « until » n’est pas une date ISO 8601 valide.") from e
+    if ds > du:
+        raise HTTPException(status_code=400, detail="« since » doit être antérieur ou égal à « until ».")
+    return s_raw, u_raw
+
 
 app = FastAPI(title="clair-obscur-api", version="0.1.0")
 app.add_middleware(
@@ -100,7 +128,80 @@ def normalized_logs(
     }
 
 
+@app.get(f"{API_V1}/logs/dynamodb")
+def normalized_logs_dynamodb(
+    limit: int = Query(50, ge=1, le=500),
+    pk: str | None = Query(
+        None,
+        description="Clé de partition ; sinon DYNAMODB_LOGS_PK, DYNAMODB_PK, DYNAMODB_LOGS_DAY ou défaut (cf. test.py).",
+    ),
+    start_key: str | None = Query(
+        None,
+        description="Curseur : repasser ``next_start_key`` de la page précédente.",
+    ),
+    region: str | None = Query(None, description="Région AWS (DynamoDB) ; défaut env / eu-west-3."),
+) -> dict[str, Any]:
+    """Logs normalisés depuis DynamoDB. Identifiants AWS : **uniquement** rôle IAM / ``.env`` du serveur (pas de clés en query)."""
+    pk_resolved = (
+        (pk or "").strip()
+        or os.getenv("DYNAMODB_LOGS_PK", "").strip()
+        or os.getenv("DYNAMODB_PK", "").strip()
+        or default_logs_partition_key()
+    )
+    try:
+        items, has_more, next_cursor = fetch_normalized_page_from_dynamodb(
+            pk=pk_resolved,
+            limit=limit,
+            start_key=(start_key or "").strip() or None,
+            region=(region or "").strip() or None,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except (ClientError, BotoCoreError) as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    return {
+        "items": items,
+        "has_more": has_more,
+        "next_start_key": next_cursor,
+        "limit": limit,
+        "pk": pk_resolved,
+    }
+
+
 @app.get(f"{API_V1}/analytics/siem")
-def siem_analytics(hours: int = Query(24, ge=1, le=168)) -> dict[str, Any]:
+def siem_analytics(
+    hours: int = Query(24, ge=1, le=168),
+    since: str | None = Query(None, description="ISO 8601 — avec « until », fenêtre fixe au lieu du glissant « hours »."),
+    until: str | None = Query(None, description="ISO 8601 — borne haute (incluse dans les agrégations)."),
+) -> dict[str, Any]:
     """KPIs et séries pour le tableau de bord SIEM (agrégations OpenSearch, repli démo si besoin)."""
-    return get_siem_dashboard(hours=hours)
+    s, u = _analytics_time_bounds(since, until)
+    return get_siem_dashboard(hours=hours, since=s, until=u)
+
+
+@app.get(f"{API_V1}/analytics/dynamodb")
+def analytics_dynamodb(
+    max_items: int = Query(8000, ge=100, le=15_000),
+    pk: str | None = Query(None, description="Partition DynamoDB ; sinon env / défaut (cf. logs DynamoDB)."),
+    region: str | None = Query(None, description="Région AWS."),
+    since: str | None = Query(None, description="ISO 8601 — avec « until », filtre la clé de tri ``sk`` (timestamp)."),
+    until: str | None = Query(None, description="ISO 8601 — borne haute incluse (clé ``sk`` < until + 1 ms)."),
+) -> dict[str, Any]:
+    """Métriques et séries à partir d’un échantillon Query sur une partition ``pk`` (identifiants côté serveur)."""
+    pk_resolved = (
+        (pk or "").strip()
+        or os.getenv("DYNAMODB_LOGS_PK", "").strip()
+        or os.getenv("DYNAMODB_PK", "").strip()
+        or default_logs_partition_key()
+    )
+    s, u = _analytics_time_bounds(since, until)
+    try:
+        return get_dynamodb_dashboard(
+            pk=pk_resolved,
+            max_items=max_items,
+            region=(region or "").strip() or None,
+            since=s,
+            until=u,
+        )
+    except (ClientError, BotoCoreError) as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e

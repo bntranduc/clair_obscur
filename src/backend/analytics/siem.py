@@ -37,11 +37,34 @@ def _histogram_buckets(agg: dict[str, Any] | None, name: str) -> list[dict[str, 
     return out
 
 
-def _search_body(*, hours: int, ts_field: str) -> dict[str, Any]:
+def _time_range_clause(*, hours: int, ts_field: str, since: str | None, until: str | None) -> dict[str, Any]:
+    """Clause ``range`` sur ``ts_field`` : fenêtre fixe ``since``/``until`` (ISO) ou glissante ``now-hours``..``now``."""
+    s = (since or "").strip()
+    u = (until or "").strip()
+    if s and u:
+        return {"gte": s, "lte": u}
+    return {"gte": f"now-{hours}h", "lte": "now"}
+
+
+def _display_hours(*, hours: int, since: str | None, until: str | None) -> int:
+    s = (since or "").strip()
+    u = (until or "").strip()
+    if not s or not u:
+        return max(1, min(hours, 168))
+    try:
+        a = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        b = datetime.fromisoformat(u.replace("Z", "+00:00"))
+        return max(1, int((b - a).total_seconds() / 3600) or 1)
+    except (TypeError, ValueError, OSError):
+        return max(1, min(hours, 168))
+
+
+def _search_body(*, hours: int, ts_field: str, since: str | None, until: str | None) -> dict[str, Any]:
+    rng = _time_range_clause(hours=hours, ts_field=ts_field, since=since, until=until)
     return {
         "size": 0,
         "track_total_hits": True,
-        "query": {"range": {ts_field: {"gte": f"now-{hours}h", "lte": "now"}}},
+        "query": {"range": {ts_field: rng}},
         "aggs": {
             "over_time": {
                 "date_histogram": {
@@ -103,7 +126,10 @@ def _fetch_geo_logs(
     hours: int,
     ts_field: str,
     size: int,
+    since: str | None = None,
+    until: str | None = None,
 ) -> list[dict[str, Any]]:
+    rng = _time_range_clause(hours=hours, ts_field=ts_field, since=since, until=until)
     body: dict[str, Any] = {
         "size": max(1, min(size, 10_000)),
         "_source": {
@@ -119,7 +145,7 @@ def _fetch_geo_logs(
         "query": {
             "bool": {
                 "must": [
-                    {"range": {ts_field: {"gte": f"now-{hours}h", "lte": "now"}}},
+                    {"range": {ts_field: rng}},
                     {"exists": {"field": "geolocation_lat"}},
                     {"exists": {"field": "geolocation_lon"}},
                 ]
@@ -135,7 +161,7 @@ def _fetch_geo_logs(
         return []
 
 
-def _parse_response(body: dict[str, Any], *, hours: int) -> dict[str, Any]:
+def _parse_response(body: dict[str, Any], *, hours: int, since: str | None, until: str | None) -> dict[str, Any]:
     total = int(body.get("hits", {}).get("total", {}).get("value", 0) or 0)
     aggs = body.get("aggregations") or {}
 
@@ -157,12 +183,24 @@ def _parse_response(body: dict[str, Any], *, hours: int) -> dict[str, Any]:
     sy = aggs.get("system_sev") or {}
     system_by_severity = _terms_buckets(sy, "by_severity")
 
-    minutes = max(hours * 60, 1)
+    s = (since or "").strip()
+    u = (until or "").strip()
+    if s and u:
+        try:
+            a = datetime.fromisoformat(s.replace("Z", "+00:00"))
+            b = datetime.fromisoformat(u.replace("Z", "+00:00"))
+            minutes = max((b - a).total_seconds() / 60.0, 1.0)
+        except (TypeError, ValueError, OSError):
+            minutes = max(hours * 60, 1)
+    else:
+        minutes = max(hours * 60, 1)
     eps_avg = total / minutes
+
+    h_disp = _display_hours(hours=hours, since=since, until=until)
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "time_range_hours": hours,
+        "time_range_hours": h_disp,
         "total_events": total,
         "events_per_minute_avg": round(eps_avg, 4),
         "unique_source_ips": unique_source_ips,
@@ -175,11 +213,15 @@ def _parse_response(body: dict[str, Any], *, hours: int) -> dict[str, Any]:
         "system_by_severity": system_by_severity,
         "geo_logs": [],
         "data_source": "opensearch",
+        "time_filter_since": s or None,
+        "time_filter_until": u or None,
     }
 
 
-def _fallback_dashboard(*, hours: int) -> dict[str, Any]:
+def _fallback_dashboard(*, hours: int, since: str | None = None, until: str | None = None) -> dict[str, Any]:
     """Données de démo si OpenSearch indisponible ou agrégation refusée."""
+    s_f = (since or "").strip() or None
+    u_f = (until or "").strip() or None
     return {
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "time_range_hours": hours,
@@ -226,6 +268,8 @@ def _fallback_dashboard(*, hours: int) -> dict[str, Any]:
             {"lat": 40.7128, "lon": -74.0060, "log_source": "application", "source_ip": "203.0.113.5"},
         ],
         "data_source": "demo",
+        "time_filter_since": s_f,
+        "time_filter_until": u_f,
     }
 
 
@@ -234,9 +278,11 @@ def get_siem_dashboard(
     index: str | None = None,
     hours: int = 24,
     ts_field: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
 ) -> dict[str, Any]:
     """
-    Agrégations SIEM sur la fenêtre ``now-hours .. now``.
+    Agrégations SIEM sur la fenêtre ``now-hours .. now`` ou ``since`` / ``until`` (ISO 8601, UTC).
 
     Retourne toujours un objet JSON valide ; en cas d’erreur réseau / mapping,
     un jeu **demo** est renvoyé (champ ``data_source`` = ``demo``).
@@ -247,12 +293,24 @@ def get_siem_dashboard(
 
     try:
         client = build_client()
-        body = _search_body(hours=h, ts_field=field)
+        body = _search_body(hours=h, ts_field=field, since=since, until=until)
         resp = client.search(index=idx, body=body)
-        out = _parse_response(resp, hours=h)
-        geo = _fetch_geo_logs(client, index=idx, hours=h, ts_field=field, size=GEO_LOG_SAMPLE_SIZE)
+        out = _parse_response(resp, hours=h, since=since, until=until)
+        geo = _fetch_geo_logs(
+            client,
+            index=idx,
+            hours=h,
+            ts_field=field,
+            size=GEO_LOG_SAMPLE_SIZE,
+            since=since,
+            until=until,
+        )
         out["geo_logs"] = geo
         return out
     except Exception:
-        out = _fallback_dashboard(hours=h)
+        out = _fallback_dashboard(
+            hours=_display_hours(hours=h, since=since, until=until),
+            since=since,
+            until=until,
+        )
         return out

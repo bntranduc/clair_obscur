@@ -6,6 +6,8 @@ import json
 import os
 import re
 import tempfile
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from openai import AsyncOpenAI
@@ -49,6 +51,19 @@ _FORBIDDEN_SQL = re.compile(
     r"\b(attach|detach|pragma|copy|export|install|load|secret|checkpoint|vacuum|alter|create|drop|insert|update|delete|truncate|grant|revoke)\b",
     re.IGNORECASE,
 )
+
+
+def _json_default_for_tool_output(obj: Any) -> Any:
+    """Types renvoyés par DuckDB (datetime, Decimal, …) non sérialisables par ``json.dumps`` par défaut."""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, date):
+        return obj.isoformat()
+    if isinstance(obj, Decimal):
+        return str(obj)
+    if isinstance(obj, bytes):
+        return obj.decode("utf-8", errors="replace")
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
 def _validate_select_only(sql: str) -> tuple[str, list[str]]:
@@ -259,7 +274,12 @@ class RunSqlOnLogsTableTool(Tool):
             "truncated": truncated,
             "rows": out_rows,
         }
-        text = json.dumps(payload, ensure_ascii=False, indent=2)
+        text = json.dumps(
+            payload,
+            ensure_ascii=False,
+            indent=2,
+            default=_json_default_for_tool_output,
+        )
         max_out = 400_000
         if len(text) > max_out:
             text = text[:max_out] + "\n… [sortie tronquée]\n"

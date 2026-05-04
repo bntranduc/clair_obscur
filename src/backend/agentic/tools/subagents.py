@@ -1,12 +1,48 @@
 import asyncio
+import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, AsyncIterator, Literal
 
 from pydantic import BaseModel, Field
 
+from backend.agentic.agent.events import AgentEvent, AgentEventType
 from backend.agentic.config.config import Config
 from backend.agentic.tools.base import Tool, ToolInvocation, ToolResult
 from backend.agentic.tools.logs_table_sql import LOGS_TABLE_SCHEMA_DOC
+
+
+def _wrap_subagent_stream_event(
+    ev: AgentEvent,
+    *,
+    definition_name: str,
+    parent_tool_call_id: str,
+) -> AgentEvent:
+    """Ajoute ``subagent`` et ``parent_tool_call_id`` pour le streaming côté UI."""
+    data = {
+        **ev.data,
+        "subagent": definition_name,
+        "parent_tool_call_id": parent_tool_call_id,
+    }
+    return AgentEvent(type=ev.type, data=data)
+
+
+_SUBAGENT_STREAM_EVENT_TYPES: frozenset[AgentEventType] = frozenset(
+    {
+        AgentEventType.PLANNING_DELTA,
+        AgentEventType.PLANNING_COMPLETE,
+        AgentEventType.REASONING_DELTA,
+        AgentEventType.REASONING_COMPLETE,
+        AgentEventType.TEXT_DELTA,
+        AgentEventType.TEXT_COMPLETE,
+        AgentEventType.TOOL_CALL_START,
+        AgentEventType.TOOL_CALL_COMPLETE,
+    }
+)
+
+# Réponse finale souvent envoyée en un seul bloc par l’API → synthèse de TEXT_DELTA pour le SSE.
+_SUBAGENT_SYNTH_TEXT_CHUNK = 44
+_SUBAGENT_SYNTH_MIN_FULL = 72
+_SUBAGENT_SYNTH_TAIL_GAP = 48
 
 
 class SubagentParams(BaseModel):
@@ -44,27 +80,13 @@ class SubagentTool(Tool):
         # Les outils internes du sous-agent portent leur propre politique ; pas de double blocage ici.
         return False
 
-    async def execute(self, invocation: ToolInvocation) -> ToolResult:
-        from backend.agentic.agent.agent import Agent
-        from backend.agentic.agent.events import AgentEventType
-
-        params = SubagentParams(**invocation.params)
-        if not params.goal:
-            return ToolResult.error_result("No goal specified for sub-agent")
-
-        config_dict = self.config.to_dict()
-        config_dict["max_turns"] = self.definition.max_turns
-        if self.definition.allowed_tools:
-            config_dict["allowed_tools"] = self.definition.allowed_tools
-
-        subagent_config = Config(**config_dict)
-
-        prompt = f"""You are a specialized sub-agent with a specific task to complete.
+    def _build_prompt(self, goal: str) -> str:
+        return f"""You are a specialized sub-agent with a specific task to complete.
 
         {self.definition.goal_prompt}
 
         YOUR TASK:
-        {params.goal}
+        {goal}
 
         IMPORTANT:
         - Focus only on completing the specified task
@@ -73,25 +95,116 @@ class SubagentTool(Tool):
         - Be concise and direct in your output
         """
 
-        tool_calls = []
-        final_response = None
-        error = None
+    async def stream_execute(
+        self,
+        invocation: ToolInvocation,
+        parent_tool_call_id: str,
+    ) -> AsyncIterator[tuple[Literal["forward", "final"], Any]]:
+        """Exécute le sous-agent ; émet ``forward`` + ``AgentEvent`` si ``parent_tool_call_id`` est non vide, puis ``final`` + ``ToolResult``."""
+        from backend.agentic.agent.agent import Agent
+
+        params = SubagentParams(**invocation.params)
+        if not params.goal:
+            yield (
+                "final",
+                ToolResult.error_result("No goal specified for sub-agent"),
+            )
+            return
+
+        config_dict = self.config.to_dict()
+        config_dict["max_turns"] = self.definition.max_turns
+        if self.definition.allowed_tools:
+            config_dict["allowed_tools"] = self.definition.allowed_tools
+
+        subagent_config = Config(**config_dict)
+        prompt = self._build_prompt(params.goal)
+
+        tool_calls: list[str] = []
+        final_response: str | None = None
+        error: str | None = None
         terminate_response = "goal"
+        stream_ui = bool(parent_tool_call_id.strip())
+        chars_from_text_deltas = 0
 
         try:
             async with Agent(subagent_config) as agent:
-                deadline = (
-                    asyncio.get_event_loop().time() + self.definition.timeout_seconds
-                )
+                deadline = time.monotonic() + self.definition.timeout_seconds
 
                 async for event in agent.run(prompt):
-                    if asyncio.get_event_loop().time() > deadline:
+                    if time.monotonic() > deadline:
                         terminate_response = "timeout"
                         final_response = "Sub-agent timed out"
                         break
 
+                    if stream_ui and event.type == AgentEventType.AGENT_STEP:
+                        if event.data.get("phase") == "llm":
+                            chars_from_text_deltas = 0
+
+                    if stream_ui and event.type == AgentEventType.TEXT_COMPLETE:
+                        content = event.data.get("content")
+                        if isinstance(content, str) and content:
+                            if (
+                                chars_from_text_deltas == 0
+                                and len(content) >= _SUBAGENT_SYNTH_MIN_FULL
+                            ):
+                                for i in range(0, len(content), _SUBAGENT_SYNTH_TEXT_CHUNK):
+                                    piece = content[i : i + _SUBAGENT_SYNTH_TEXT_CHUNK]
+                                    yield (
+                                        "forward",
+                                        _wrap_subagent_stream_event(
+                                            AgentEvent.text_delta(piece),
+                                            definition_name=self.definition.name,
+                                            parent_tool_call_id=parent_tool_call_id,
+                                        ),
+                                    )
+                                    await asyncio.sleep(0)
+                            elif len(content) > chars_from_text_deltas + _SUBAGENT_SYNTH_TAIL_GAP:
+                                tail = content[chars_from_text_deltas:]
+                                for i in range(0, len(tail), _SUBAGENT_SYNTH_TEXT_CHUNK):
+                                    piece = tail[i : i + _SUBAGENT_SYNTH_TEXT_CHUNK]
+                                    yield (
+                                        "forward",
+                                        _wrap_subagent_stream_event(
+                                            AgentEvent.text_delta(piece),
+                                            definition_name=self.definition.name,
+                                            parent_tool_call_id=parent_tool_call_id,
+                                        ),
+                                    )
+                                    await asyncio.sleep(0)
+                        chars_from_text_deltas = 0
+                        yield (
+                            "forward",
+                            _wrap_subagent_stream_event(
+                                event,
+                                definition_name=self.definition.name,
+                                parent_tool_call_id=parent_tool_call_id,
+                            ),
+                        )
+                        await asyncio.sleep(0)
+                    elif stream_ui and event.type in _SUBAGENT_STREAM_EVENT_TYPES:
+                        if event.type == AgentEventType.TEXT_DELTA:
+                            frag = event.data.get("content")
+                            if isinstance(frag, str):
+                                chars_from_text_deltas += len(frag)
+                        yield (
+                            "forward",
+                            _wrap_subagent_stream_event(
+                                event,
+                                definition_name=self.definition.name,
+                                parent_tool_call_id=parent_tool_call_id,
+                            ),
+                        )
+                        if event.type in (
+                            AgentEventType.PLANNING_DELTA,
+                            AgentEventType.REASONING_DELTA,
+                            AgentEventType.TEXT_DELTA,
+                        ):
+                            await asyncio.sleep(0)
+
                     if event.type == AgentEventType.TOOL_CALL_START:
-                        tool_calls.append(event.data.get("name"))
+                        n = event.data.get("name")
+                        if isinstance(n, str):
+                            tool_calls.append(n)
                     elif event.type == AgentEventType.TEXT_COMPLETE:
                         final_response = event.data.get("content")
                     elif event.type == AgentEventType.AGENT_END:
@@ -99,7 +212,7 @@ class SubagentTool(Tool):
                             final_response = event.data.get("response")
                     elif event.type == AgentEventType.AGENT_ERROR:
                         terminate_response = "error"
-                        error = event.data.get("error", "Unknown")
+                        error = str(event.data.get("error", "Unknown"))
                         final_response = f"Sub-agent error: {error}"
                         break
         except Exception as e:
@@ -116,9 +229,19 @@ class SubagentTool(Tool):
         """
 
         if error:
-            return ToolResult.error_result(result)
+            yield ("final", ToolResult.error_result(result))
+        else:
+            yield ("final", ToolResult.success_result(result))
 
-        return ToolResult.success_result(result)
+    async def execute(self, invocation: ToolInvocation) -> ToolResult:
+        final: ToolResult | None = None
+        async for kind, payload in self.stream_execute(
+            invocation, parent_tool_call_id=""
+        ):
+            if kind == "final":
+                final = payload
+        assert final is not None
+        return final
 
 
 CODEBASE_INVESTIGATOR = SubagentDefinition(
