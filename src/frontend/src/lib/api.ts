@@ -1,4 +1,5 @@
 import type { NormalizedEvent } from "@/lib/normalizedLog";
+import type { AlertsCatalogResponse } from "@/types/alertsCatalog";
 import type { SiemDashboard } from "@/types/siemAnalytics";
 import { getBackendBaseUrl } from "@/lib/apiBackendUrl";
 
@@ -168,6 +169,77 @@ export async function fetchDynamodbAnalytics(
   }
   const j = (await res.json()) as SiemDashboard & { geo_logs?: SiemDashboard["geo_logs"] };
   return { ...j, geo_logs: Array.isArray(j.geo_logs) ? j.geo_logs : [] };
+}
+
+/** Catalogue d’alertes SOC (jeu JSON côté API — même source que l’outil ``get_all_alerts``). */
+export async function fetchAllAlerts(): Promise<AlertsCatalogResponse> {
+  const url = `${getApiUrl()}/api/v1/alerts`;
+  const res = await fetch(url, apiFetchInit);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let detail = text;
+    try {
+      const j = JSON.parse(text) as { detail?: unknown };
+      if (typeof j.detail === "string") detail = j.detail;
+    } catch {
+      /* keep raw */
+    }
+    throw new Error(`GET /api/v1/alerts failed (${res.status}): ${String(detail).slice(0, 800)}`.trim());
+  }
+  return (await res.json()) as AlertsCatalogResponse;
+}
+
+/** Réponse ``GET /api/v1/alerts/clustering`` — graphe force pour clusters DBSCAN. */
+export type AlertClusteringNode = {
+  id: string;
+  label: string;
+  cluster_id: number;
+  severity: string;
+  title: string;
+};
+
+export type AlertClusteringEdge = { source: string; target: string; weight: number };
+
+export type AlertClusteringResponse = {
+  nodes: AlertClusteringNode[];
+  edges: AlertClusteringEdge[];
+  clusters: { id: number; label: string; size: number }[];
+  meta: {
+    count: number;
+    algorithm: string;
+    eps: number;
+    min_samples: number;
+    max_neighbors?: number;
+    noise_count: number;
+    n_clusters: number;
+    feature_columns: string[];
+  };
+};
+
+export async function fetchAlertClustering(options?: {
+  eps?: number;
+  min_samples?: number;
+  max_neighbors?: number;
+}): Promise<AlertClusteringResponse> {
+  const sp = new URLSearchParams();
+  if (options?.eps != null) sp.set("eps", String(options.eps));
+  if (options?.min_samples != null) sp.set("min_samples", String(options.min_samples));
+  if (options?.max_neighbors != null) sp.set("max_neighbors", String(options.max_neighbors));
+  const q = sp.toString();
+  const url = `${getApiUrl()}/api/v1/alerts/clustering${q ? `?${q}` : ""}`;
+  const res = await fetch(url, apiFetchInit);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let detail = text;
+    try {
+      const j = JSON.parse(text) as { detail?: unknown };
+      if (typeof j.detail === "string") detail = j.detail;
+    } catch {
+      /* keep raw */
+    }
+    throw new Error(`GET /api/v1/alerts/clustering failed (${res.status}): ${String(detail).slice(0, 800)}`.trim());
+  }
+  return (await res.json()) as AlertClusteringResponse;
 }
 
 export type ChatApiMessage = { role: "user" | "assistant"; content: string };

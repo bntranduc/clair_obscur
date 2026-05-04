@@ -15,6 +15,7 @@ from backend.agentic.tools.clair_log_classifier import ClassifyFirewallLogTool
 from backend.agentic.tools.logs_table_sql import BuildSqlForLogsTableTool, RunSqlOnLogsTableTool
 from backend.agentic.tools.s3_normalized_logs import FetchNormalizedLogsFromS3Tool
 from backend.agentic.tools.subagents import SubagentTool, get_logs_pipeline_subagent_definitions
+from backend.agentic.tools.alerts_dataset import GetAllAlertsTool
 from backend.agentic.tools.remediation_subagent import get_remediation_subagent_definitions
 from backend.agentic.tools.mitre_subagent import get_mitre_subagent_definitions
 from backend.agentic.tools.visualization import VisualizationFromPromptTool, get_visualization_subagent_definitions
@@ -201,8 +202,10 @@ def create_default_registry(config: Config) -> ToolRegistry:
     - Remédiation IR : ``subagent_remediation_soc`` (plan contain/eradicate/recover, outils lecture).
     - Web public : ``web_search`` (DuckDuckGo), ``web_fetch`` (GET HTTP/HTTPS, corps tronqué).
     - MITRE : ``subagent_mitre_simple`` (référence ATT&CK via web uniquement).
+    - Alertes catalogue : ``get_all_alerts`` (jeu JSON ; même source que ``GET /api/v1/alerts``).
     """
     registry = ToolRegistry(config)
+    registry.register(GetAllAlertsTool(config))
     registry.register(WebSearchTool(config))
     registry.register(WebFetchTool(config))
     registry.register(ClassifyFirewallLogTool(config))

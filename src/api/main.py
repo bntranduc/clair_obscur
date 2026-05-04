@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from datetime import datetime
 from typing import Any, Literal
@@ -24,6 +25,8 @@ from backend.analytics.dynamodb_dashboard import (  # noqa: E402
     get_dynamodb_dashboard,
 )
 from backend.analytics.siem import get_siem_dashboard  # noqa: E402
+from backend.alerts.store import load_all_alerts  # noqa: E402
+from backend.clustering import compute_alert_cluster_graph  # noqa: E402
 from api.agent_catalog import build_agent_catalog  # noqa: E402
 from api.agentic_bridge import _repo_root  # noqa: E402
 from api.agentic_router import router as agentic_router  # noqa: E402
@@ -75,6 +78,51 @@ def agents_catalog_alias() -> dict[str, Any]:
 @app.get("/")
 def root() -> dict[str, str]:
     return {"service": "clair-obscur-api"}
+
+
+@app.get(f"{API_V1}/alerts", tags=["alerts"])
+def get_all_alerts() -> dict[str, Any]:
+    """Liste toutes les alertes du catalogue (fichier JSON ; futur : base dédiée)."""
+    try:
+        return load_all_alerts()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except (OSError, ValueError, json.JSONDecodeError) as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@app.get(f"{API_V1}/alerts/clustering", tags=["alerts"])
+def alerts_clustering(
+    eps: float = Query(1.05, ge=0.05, le=5.0, description="Rayon DBSCAN sur vecteurs standardisés (souvent ~0.9–1.4)."),
+    min_samples: int = Query(2, ge=2, le=20, description="Points minimum pour former une densité."),
+    max_neighbors: int = Query(
+        3,
+        ge=1,
+        le=12,
+        description="Voisins intra-cluster reliés par arête (graphe de proximité).",
+    ),
+) -> dict[str, Any]:
+    """Clustering DBSCAN sur traits dérivés du catalogue + graphe k-voisins pour la vue réseau."""
+    try:
+        raw = load_all_alerts()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except (OSError, ValueError, json.JSONDecodeError) as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    alert_list = raw.get("alerts")
+    if not isinstance(alert_list, list):
+        raise HTTPException(status_code=500, detail="Catalogue d’alertes invalide.")
+
+    try:
+        return compute_alert_cluster_graph(
+            alert_list,
+            eps=eps,
+            min_samples=min_samples,
+            max_neighbors=max_neighbors,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=501, detail=str(e)) from e
 
 
 def _credentials_from_query(

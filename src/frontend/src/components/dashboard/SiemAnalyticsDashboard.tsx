@@ -14,6 +14,7 @@ import {
   Radio,
   RefreshCw,
   Shield,
+  ShieldAlert,
   Users,
 } from "lucide-react";
 import {
@@ -31,6 +32,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import AlertsAnalyticsTab from "@/components/dashboard/AlertsAnalyticsTab";
 import { fetchDynamodbAnalytics, fetchSiemAnalytics } from "@/lib/api";
 import type { SiemDashboard, SiemGeoLogPoint, SiemKeyCount } from "@/types/siemAnalytics";
 
@@ -648,10 +650,10 @@ function SiemDashboardView({
   );
 }
 
-type TabId = "general" | "siem";
+type TabId = "alerts" | "general" | "siem";
 
 export default function SiemAnalyticsDashboard() {
-  const [tab, setTab] = useState<TabId>("general");
+  const [tab, setTab] = useState<TabId>("alerts");
   const [siemData, setSiemData] = useState<SiemDashboard | null>(null);
   const [dynamoData, setDynamoData] = useState<SiemDashboard | null>(null);
   const [siemErr, setSiemErr] = useState<string | null>(null);
@@ -710,11 +712,6 @@ export default function SiemAnalyticsDashboard() {
     return () => clearInterval(id);
   }, [loadSiem]);
 
-  const activeLoading = tab === "general" ? loadingDynamo : loadingSiem;
-  const activeError = tab === "general" ? dynamoErr : siemErr;
-  const activeData = tab === "general" ? dynamoData : siemData;
-  const activeLoad = tab === "general" ? loadDynamo : loadSiem;
-
   const applyTimeFilter = () => {
     setTimeFilterErr(null);
     const sIso = datetimeLocalToIsoUtc(sinceInput);
@@ -755,6 +752,7 @@ export default function SiemAnalyticsDashboard() {
         </div>
       </header>
 
+      {tab !== "alerts" ? (
       <section
         className="rounded-2xl border border-white/[0.08] bg-zinc-900/30 p-4 ring-1 ring-white/[0.04] sm:p-5"
         aria-label="Filtre par période"
@@ -815,8 +813,27 @@ export default function SiemAnalyticsDashboard() {
           </p>
         )}
       </section>
+      ) : (
+        <p className="rounded-xl border border-white/[0.06] bg-zinc-900/25 px-4 py-3 text-[13px] text-zinc-500">
+          L’onglet <span className="font-medium text-zinc-400">Alertes</span> utilise le catalogue statique (GET{" "}
+          <code className="font-mono text-zinc-400">/api/v1/alerts</code>
+          ). Le filtre période ci‑dessous s’applique aux onglets DynamoDB et SIEM.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2 border-b border-white/[0.08] pb-1">
+        <button
+          type="button"
+          onClick={() => setTab("alerts")}
+          className={`inline-flex items-center gap-2 rounded-t-lg px-4 py-2.5 text-sm font-medium transition ${
+            tab === "alerts"
+              ? "bg-zinc-900 text-white ring-1 ring-white/10"
+              : "text-zinc-500 hover:text-zinc-300"
+          }`}
+        >
+          <ShieldAlert size={16} aria-hidden />
+          Alertes
+        </button>
         <button
           type="button"
           onClick={() => setTab("general")}
@@ -841,37 +858,70 @@ export default function SiemAnalyticsDashboard() {
         </button>
       </div>
 
-      {activeLoading && !activeData ? (
-        <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-zinc-500">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500/80" aria-hidden />
-          <p className="text-sm">{tab === "general" ? "Chargement DynamoDB…" : "Chargement SIEM…"}</p>
-        </div>
+      {tab === "alerts" ? <AlertsAnalyticsTab /> : null}
+
+      {tab === "general" ? (
+        <>
+          {loadingDynamo && !dynamoData ? (
+            <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-zinc-500">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-500/80" aria-hidden />
+              <p className="text-sm">Chargement DynamoDB…</p>
+            </div>
+          ) : null}
+          {dynamoErr && !dynamoData ? (
+            <div className="rounded-2xl border border-red-500/30 bg-red-950/20 p-6 text-red-200">
+              <p className="font-medium">Impossible de charger cet onglet.</p>
+              <p className="mt-2 text-sm text-red-300/80">{dynamoErr}</p>
+              <button
+                type="button"
+                onClick={() => void loadDynamo()}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg border border-red-400/40 px-3 py-2 text-sm text-red-100 hover:bg-red-950/40"
+              >
+                <RefreshCw size={16} /> Réessayer
+              </button>
+            </div>
+          ) : null}
+          {dynamoData ? (
+            <SiemDashboardView
+              data={dynamoData}
+              onRefresh={() => void loadDynamo()}
+              refreshing={loadingDynamo}
+              dynamoTimelineBucket={dynamoTimelineBucket}
+              onDynamoTimelineBucketChange={setDynamoTimelineBucket}
+            />
+          ) : null}
+        </>
       ) : null}
 
-      {activeError && !activeData ? (
-        <div className="rounded-2xl border border-red-500/30 bg-red-950/20 p-6 text-red-200">
-          <p className="font-medium">Impossible de charger cet onglet.</p>
-          <p className="mt-2 text-sm text-red-300/80">{activeError}</p>
-          <button
-            type="button"
-            onClick={() => {
-              void activeLoad();
-            }}
-            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-red-400/40 px-3 py-2 text-sm text-red-100 hover:bg-red-950/40"
-          >
-            <RefreshCw size={16} /> Réessayer
-          </button>
-        </div>
-      ) : null}
-
-      {activeData ? (
-        <SiemDashboardView
-          data={activeData}
-          onRefresh={() => void activeLoad()}
-          refreshing={activeLoading}
-          dynamoTimelineBucket={dynamoTimelineBucket}
-          onDynamoTimelineBucketChange={setDynamoTimelineBucket}
-        />
+      {tab === "siem" ? (
+        <>
+          {loadingSiem && !siemData ? (
+            <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-zinc-500">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-500/80" aria-hidden />
+              <p className="text-sm">Chargement SIEM…</p>
+            </div>
+          ) : null}
+          {siemErr && !siemData ? (
+            <div className="rounded-2xl border border-red-500/30 bg-red-950/20 p-6 text-red-200">
+              <p className="font-medium">Impossible de charger cet onglet.</p>
+              <p className="mt-2 text-sm text-red-300/80">{siemErr}</p>
+              <button
+                type="button"
+                onClick={() => void loadSiem()}
+                className="mt-4 inline-flex items-center gap-2 rounded-lg border border-red-400/40 px-3 py-2 text-sm text-red-100 hover:bg-red-950/40"
+              >
+                <RefreshCw size={16} /> Réessayer
+              </button>
+            </div>
+          ) : null}
+          {siemData ? (
+            <SiemDashboardView
+              data={siemData}
+              onRefresh={() => void loadSiem()}
+              refreshing={loadingSiem}
+            />
+          ) : null}
+        </>
       ) : null}
     </div>
   );

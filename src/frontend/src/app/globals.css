@@ -71,6 +71,116 @@ body {
   scrollbar-color: #3f3f46 #0a0a0c;
 }
 
+/* Analytics onglet Alertes — halos animés (importance : strong / default / subtle) */
+@keyframes analytics-ambient-strong {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1) translate(0, 0);
+  }
+  50% {
+    opacity: 0.82;
+    transform: scale(1.1) translate(3px, -4px);
+  }
+}
+@keyframes analytics-ambient {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.52;
+    transform: scale(1.05);
+  }
+}
+@keyframes analytics-ambient-subtle {
+  0%,
+  100% {
+    opacity: 0.18;
+  }
+  50% {
+    opacity: 0.36;
+  }
+}
+.analytics-ambient-strong {
+  animation: analytics-ambient-strong 5.5s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+.analytics-ambient {
+  animation: analytics-ambient 7s ease-in-out infinite;
+  animation-delay: -1.5s;
+  will-change: opacity, transform;
+}
+.analytics-ambient-subtle {
+  animation: analytics-ambient-subtle 9s ease-in-out infinite;
+  animation-delay: -3s;
+  will-change: opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .analytics-ambient-strong,
+  .analytics-ambient,
+  .analytics-ambient-subtle {
+    animation: none;
+    opacity: 0.45;
+    transform: none;
+  }
+}
+
+/* Accueil SOC — cartes criticité : entrée échelonnée (alignée esprit Analytics) */
+@keyframes soc-severity-kpi-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.soc-severity-kpi-enter {
+  animation: soc-severity-kpi-enter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .soc-severity-kpi-enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+/* Accueil SOC — zone line chart : entrée après les cartes criticité */
+@keyframes soc-alert-timeline-enter {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.soc-alert-timeline-enter {
+  animation: soc-alert-timeline-enter 0.68s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .soc-alert-timeline-enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
 /* Sidebar glass */
 .sidebar-glass {
   background: linear-gradient(180deg, rgba(24, 24, 27, 0.92) 0%, rgba(9, 9, 11, 0.98) 100%);

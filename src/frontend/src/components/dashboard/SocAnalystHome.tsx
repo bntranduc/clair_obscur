@@ -7,13 +7,17 @@ import {
   Bot,
   ClipboardList,
   LayoutDashboard,
+  Loader2,
   Radio,
   Search,
   ShieldAlert,
   Sparkles,
   Zap,
 } from "lucide-react";
-import { fetchSiemAnalytics } from "@/lib/api";
+import AlertCatalogTimelineChart from "@/components/dashboard/AlertCatalogTimelineChart";
+import SeverityKpiCards from "@/components/dashboard/SeverityKpiCards";
+import { fetchAllAlerts, fetchSiemAnalytics } from "@/lib/api";
+import { alertsTimelineByDayUtc, countAlertsBySeverityFour } from "@/lib/alertCatalogAggregates";
 import type { SiemDashboard } from "@/types/siemAnalytics";
 
 function formatFrDate(d: Date): string {
@@ -27,6 +31,10 @@ function formatFrDate(d: Date): string {
 
 function formatFrTime(d: Date): string {
   return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatInt(n: number): string {
+  return new Intl.NumberFormat("fr-FR").format(Math.round(n));
 }
 
 const quickLinks: {
@@ -94,6 +102,15 @@ export default function SocAnalystHome() {
   const [siem, setSiem] = useState<SiemDashboard | null>(null);
   const [siemError, setSiemError] = useState<string | null>(null);
   const [siemLoading, setSiemLoading] = useState(true);
+  const [alertsLoading, setAlertsLoading] = useState(true);
+  const [alertsError, setAlertsError] = useState<string | null>(null);
+  const [alertTotal, setAlertTotal] = useState<number>(0);
+  const [severityFour, setSeverityFour] = useState<{ critical: number; high: number; medium: number; faible: number } | null>(
+    null,
+  );
+  const [alertDayRows, setAlertDayRows] = useState<
+    { day: string; full: string; count: number }[]
+  >([]);
 
   useEffect(() => {
     setNow(new Date());
@@ -114,6 +131,34 @@ export default function SocAnalystHome() {
           setSiemError(e instanceof Error ? e.message : "Indisponible");
       } finally {
         if (!cancelled) setSiemLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setAlertsLoading(true);
+        setAlertsError(null);
+        const res = await fetchAllAlerts();
+        if (cancelled) return;
+        const list = Array.isArray(res.alerts) ? res.alerts : [];
+        setAlertTotal(typeof res.count === "number" ? res.count : list.length);
+        setSeverityFour(countAlertsBySeverityFour(list));
+        setAlertDayRows(alertsTimelineByDayUtc(list));
+      } catch (e) {
+        if (!cancelled) {
+          setAlertsError(e instanceof Error ? e.message : "Catalogue d’alertes indisponible.");
+          setAlertTotal(0);
+          setSeverityFour({ critical: 0, high: 0, medium: 0, faible: 0 });
+          setAlertDayRows([]);
+        }
+      } finally {
+        if (!cancelled) setAlertsLoading(false);
       }
     })();
     return () => {
@@ -149,7 +194,8 @@ export default function SocAnalystHome() {
               Centre d’opérations
             </h1>
             <p className="max-w-xl text-[15px] leading-relaxed text-zinc-400">
-              Vue d’ensemble pour démarrer un shift : indicateurs SIEM 24 h, accès rapides et rappels d’investigation.
+              Vue d’ensemble pour démarrer un shift : volume d’alertes par criticité, tendance temporelle du catalogue,
+              puis indicateurs SIEM 24 h et accès rapides.
             </p>
           </div>
           <div className="flex flex-col items-start gap-1 rounded-xl border border-white/[0.08] bg-black/25 px-5 py-4 text-left lg:items-end lg:text-right">
@@ -161,6 +207,50 @@ export default function SocAnalystHome() {
           </div>
         </div>
       </header>
+
+      {/* Catalogue alertes — criticité + courbe */}
+      <section aria-labelledby="soc-alerts-heading" className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 id="soc-alerts-heading" className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
+              Alertes par criticité
+            </h2>
+            <p className="mt-1 max-w-2xl text-[13px] text-zinc-500">
+              Données du catalogue (<code className="rounded bg-zinc-800/80 px-1 font-mono text-[11px]">GET /api/v1/alerts</code>
+              ). Faible inclut low, info et autres niveaux.
+            </p>
+          </div>
+          {alertsLoading ? (
+            <span className="inline-flex items-center gap-2 text-[12px] text-zinc-500">
+              <Loader2 className="h-4 w-4 animate-spin text-cyan-500/90" aria-hidden />
+              Chargement…
+            </span>
+          ) : (
+            <span className="rounded-full bg-cyan-500/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-cyan-200/95 ring-1 ring-cyan-500/25">
+              {formatInt(alertTotal)} alerte{alertTotal !== 1 ? "s" : ""} au catalogue
+            </span>
+          )}
+        </div>
+
+        {alertsError ? (
+          <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            {alertsError}
+          </p>
+        ) : null}
+
+        <SeverityKpiCards loading={alertsLoading} severityFour={severityFour} totalCatalog={alertTotal} />
+
+        <div className="rounded-2xl border border-white/[0.08] bg-zinc-900/40 p-5 ring-1 ring-white/[0.05] sm:p-6">
+          <h3 className="text-[13px] font-semibold text-white">Nombre d’alertes dans le temps</h3>
+          <p className="mt-0.5 text-[12px] text-zinc-500">
+            Agrégation par jour UTC · <code className="text-zinc-400">detection.attack_start_time</code> (ou fin
+            d’attaque si début absent)
+          </p>
+          <div className="mt-5">
+            <AlertCatalogTimelineChart dayRows={alertDayRows} loading={alertsLoading} enterDelayMs={400} />
+          </div>
+        </div>
+      </section>
 
       {/* KPIs */}
       <section aria-labelledby="soc-kpi-heading">
