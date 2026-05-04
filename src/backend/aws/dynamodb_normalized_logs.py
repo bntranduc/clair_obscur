@@ -16,6 +16,12 @@ import boto3
 
 def _aws_session(region: str) -> boto3.Session:
     """Aligné sur ``test.py`` : profil ou clés explicites."""
+    # Comme ``AwsClient.session`` : boto3/botocore lit ``AWS_PROFILE`` même sans ``profile_name`` ;
+    # une valeur vide → ProfileNotFound (profil "").
+    _ap = os.environ.get("AWS_PROFILE")
+    if _ap is not None and not str(_ap).strip():
+        del os.environ["AWS_PROFILE"]
+
     ak = (os.getenv("AWS_ACCESS_KEY_ID") or "").strip()
     sk = (os.getenv("AWS_SECRET_ACCESS_KEY") or "").strip()
     st = (os.getenv("AWS_SESSION_TOKEN") or "").strip() or None
