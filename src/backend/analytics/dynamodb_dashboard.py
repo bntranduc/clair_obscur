@@ -197,7 +197,7 @@ def get_dynamodb_dashboard(
                         row[k] = v
                 geo_logs.append(row)
 
-    timeline = [{"t": t, "count": c} for t, c in sorted(by_hour.items(), key=lambda x: x[0])]
+    timeline = [{"t": t, "count": c} for t, c in sorted(by_timeline.items(), key=lambda x: x[0])]
     log_sources = [{"key": k, "count": v} for k, v in by_source.most_common(20)]
     top_raw = by_ip.most_common(15)
     top_source_ips = [{"ip": k, "count": v} for k, v in top_raw]

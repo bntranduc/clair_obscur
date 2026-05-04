@@ -4,8 +4,8 @@ L'orchestrateur (agent principal) délègue avec ``subagent_remediation_soc`` lo
 demande explicitement des **mesures correctives**, un **plan contain/eradicate/recover**, ou
 une **priorisation opérationnelle** à partir d'un contexte d'alerte déjà décrit.
 
-Outils autorisés : enrichissement factuel uniquement (logs S3, SQL DuckDB sur un jeu injecté,
-classification firewall ligne à ligne). Aucune exécution de blocage ou SOAR.
+Outils autorisés : enrichissement factuel (logs S3, SQL DuckDB, classification firewall),
+recherche web publique (CVE, avis éditeur, doc). Aucune exécution de blocage ou SOAR.
 """
 
 from __future__ import annotations
@@ -17,8 +17,8 @@ REMEDIATION_SOC_SUBAGENT = SubagentDefinition(
     name="remediation_soc",
     description=(
         "Sous-agent **remédiation IR** : plan d'actions (contain / eradicate / recover) enrichi par "
-        "extractions SQL sur les logs de la fenêtre d'alerte (IoC, timestamps). Logs S3, table "
-        "`logs`, ou classification firewall ligne à ligne."
+        "extractions SQL sur les logs de la fenêtre d'alerte (IoC, timestamps), classification firewall, "
+        "ou **recherche web** (CVE, avis éditeur, doc publique)."
     ),
     goal_prompt=f"""Tu es le sous-agent **remédiation & réponse aux incidents** pour analystes SOC (CLAIR OBSCUR).
 
@@ -87,6 +87,9 @@ les données disponibles ; n'invente pas de résultats chiffrés.
 
 - ``classify_firewall_log`` : si la tâche inclut une **ligne** firewall CSV ou JSON ; utilise le
   résultat pour affiner sévérité / type et la teneur des recommandations.
+- ``web_search`` / ``web_fetch`` : **public uniquement** — rechercher une CVE, un avis éditeur, une
+  note de version ou une recommandation MITRE / NIST **générique** ; cite titre + URL en une ligne.
+  Ne diffusent pas de données internes (secrets, extraits de logs nominatifs) vers le web.
 
 Si aucun outil n'est nécessaire (contexte déjà suffisant), **n'en appelle pas** : réponds directement.
 
@@ -104,6 +107,8 @@ ni les playbooks contractuels de l'organisation.""",
         "fetch_normalized_logs_from_s3",
         "build_sql_for_logs_table",
         "run_sql_on_logs_table",
+        "web_search",
+        "web_fetch",
     ],
     max_turns=20,
     timeout_seconds=480,

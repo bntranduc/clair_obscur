@@ -311,3 +311,70 @@ export async function submitAgenticApproval(
   }
   return Boolean(body.ok);
 }
+
+// ---------------------------------------------------------------------------
+// Catalogue agents (paramètres UI)
+// ---------------------------------------------------------------------------
+
+export type CatalogToolInfo = {
+  name: string;
+  description: string;
+  kind: string | null;
+  parameters?: unknown;
+  missing?: boolean;
+};
+
+export type SubagentCatalogEntry = {
+  id: string;
+  kind: "subagent";
+  internal_name: string;
+  description: string;
+  prompt: string;
+  tools: CatalogToolInfo[];
+  max_turns: number;
+  timeout_seconds: number;
+};
+
+export type PrincipalCatalogEntry = {
+  id: string;
+  kind: "principal";
+  title: string;
+  description: string;
+  prompt: string;
+  tools: CatalogToolInfo[];
+};
+
+export type AgentCatalogResponse = {
+  principal: PrincipalCatalogEntry;
+  subagents: SubagentCatalogEntry[];
+};
+
+export async function fetchAgentCatalog(): Promise<AgentCatalogResponse> {
+  const base = getApiUrl();
+  const paths = ["/api/v1/agentic/catalog", "/api/v1/agents/catalog"];
+  let lastStatus = 0;
+  let lastBody = "";
+  for (const path of paths) {
+    const res = await fetch(`${base}${path}`, {
+      ...apiFetchInit,
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    if (res.ok) {
+      return (await res.json()) as AgentCatalogResponse;
+    }
+    lastStatus = res.status;
+    lastBody = await res.text().catch(() => "");
+    if (res.status !== 404) {
+      break;
+    }
+  }
+  const hint =
+    typeof window !== "undefined" &&
+    (!base || base.startsWith("http://127.0.0.1") || base.startsWith("http://localhost"))
+      ? " Vérifiez que l’API tourne (ex. uvicorn sur le port 8020) et que NEXT_PUBLIC_API_BASE pointe vers la bonne URL."
+      : " Vérifiez NEXT_PUBLIC_API_BASE / déploiement de l’API (routes agentic ≥ version catalogue).";
+  throw new Error(
+    `Catalogue agents (${lastStatus})${lastBody ? `: ${lastBody.slice(0, 240)}` : ""}.${hint}`.trim(),
+  );
+}

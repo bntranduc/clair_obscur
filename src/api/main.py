@@ -24,8 +24,11 @@ from backend.analytics.dynamodb_dashboard import (  # noqa: E402
     get_dynamodb_dashboard,
 )
 from backend.analytics.siem import get_siem_dashboard  # noqa: E402
+from api.agent_catalog import build_agent_catalog  # noqa: E402
+from api.agentic_bridge import _repo_root  # noqa: E402
 from api.agentic_router import router as agentic_router  # noqa: E402
 from api.chat_router import router as chat_router  # noqa: E402
+from backend.agentic.config.loader import load_config  # noqa: E402
 
 API_V1 = "/api/v1"
 
@@ -61,6 +64,12 @@ app.add_middleware(
 )
 app.include_router(chat_router)
 app.include_router(agentic_router)
+
+
+@app.get(f"{API_V1}/agents/catalog")
+def agents_catalog_alias() -> dict[str, Any]:
+    """Même contenu que ``GET /api/v1/agentic/catalog`` (alias si proxy / ancien routage)."""
+    return build_agent_catalog(load_config(_repo_root()))
 
 
 @app.get("/")

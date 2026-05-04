@@ -145,6 +145,71 @@ function emptyAssistantRun(): AssistantRun {
   return { segments: [] };
 }
 
+function lastAgentStepSegment(segments: RunSegment[]): StepSegment | null {
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const s = segments[i];
+    if (s.kind === 'step') return s;
+  }
+  return null;
+}
+
+/** Affiche le bandeau « Réflexion… » pendant le tour LLM (avant/après deltas planning/reasoning), pas pendant exécution outils. */
+function shouldShowReflexionBanner(segments: RunSegment[], isLiveStreaming: boolean): boolean {
+  if (!isLiveStreaming) return false;
+  const st = lastAgentStepSegment(segments);
+  if (st?.phase === 'tools') return false;
+  if (
+    segments.some(
+      (s) =>
+        (s.kind === 'reasoning' || s.kind === 'planning') && s.streaming,
+    )
+  ) {
+    return false;
+  }
+  const last = segments[segments.length - 1];
+  if (last?.kind === 'text' && last.streaming) return false;
+  if (last?.kind === 'tool' && last.pending) return false;
+  return true;
+}
+
+function ReflexionStatusRow({ subtle }: { subtle?: boolean }) {
+  return (
+    <div
+      className={
+        subtle
+          ? 'rounded-xl border border-cyan-500/20 bg-cyan-950/20 px-3 py-2.5'
+          : 'rounded-2xl rounded-bl-md border border-cyan-500/30 bg-gradient-to-r from-cyan-950/45 via-zinc-900/55 to-blue-950/40 px-4 py-3 shadow-[0_0_24px_-8px_rgba(34,211,238,0.25)]'
+      }
+      role="status"
+      aria-live="polite"
+      aria-label="Réflexion en cours"
+    >
+      <div className="flex items-center gap-3">
+        <Brain
+          size={subtle ? 16 : 18}
+          className="text-cyan-400 shrink-0 drop-shadow-[0_0_10px_rgba(34,211,238,0.35)]"
+          aria-hidden
+        />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-slate-100 flex items-center gap-1.5 flex-wrap">
+            <span>Réflexion</span>
+            <span className="reflexion-dots inline-flex items-center translate-y-px" aria-hidden>
+              <span />
+              <span />
+              <span />
+            </span>
+          </p>
+          {!subtle ? (
+            <div className="reflexion-shimmer-bar mt-2.5 w-full max-w-[min(100%,16rem)] opacity-95" />
+          ) : (
+            <div className="reflexion-shimmer-bar mt-2 h-[2px] w-full max-w-[12rem] opacity-70" />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const WELCOME_ROWS: ChatRow[] = [
   {
     role: 'assistant',
@@ -664,7 +729,7 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
       <div
         className={
           variant === "page"
-            ? "flex h-full flex-col items-center justify-center rounded-xl text-sm text-gray-400 ring-1 ring-inset ring-white/[0.1]"
+            ? "flex min-h-0 min-w-0 flex-1 w-full flex-col items-center justify-center overflow-hidden bg-zinc-950/50 text-sm text-gray-400"
             : "flex h-full min-h-[40vh] w-full flex-col items-center justify-center text-sm text-gray-400"
         }
       >
@@ -679,7 +744,7 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
     <div
       className={
         variant === "page"
-          ? "relative flex h-full min-h-0 w-full max-w-full flex-1 flex-row overflow-hidden rounded-xl ring-1 ring-inset ring-white/[0.1]"
+          ? "relative flex min-h-0 min-w-0 w-full flex-1 flex-row overflow-hidden bg-zinc-950/55"
           : "relative flex h-full min-h-0 w-full max-w-full flex-row overflow-hidden rounded-none md:rounded-l-2xl"
       }
     >
@@ -703,8 +768,20 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
         onDelete={deleteSession}
         disabled={busy}
       />
-      <div className="flex flex-col flex-1 min-h-0 min-w-0">
-        <div className="p-6 border-b border-white/10 shrink-0">
+      <div
+        className={
+          variant === "page"
+            ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-5 sm:px-7 lg:px-10"
+            : "flex min-h-0 min-w-0 flex-1 flex-col"
+        }
+      >
+        <div
+          className={
+            variant === "page"
+              ? "border-b border-white/10 px-0 py-6 shrink-0"
+              : "border-b border-white/10 p-6 shrink-0"
+          }
+        >
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Sparkles size={24} className="text-blue-400" />
             {activeSession.title}
@@ -720,12 +797,24 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
         </div>
 
         {streamError && (
-          <div className="mx-6 mt-4 px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm shrink-0">
+          <div
+            className={
+              variant === "page"
+                ? "mt-4 shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-300"
+                : "mx-6 mt-4 shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-300"
+            }
+          >
             {streamError}
           </div>
         )}
 
-        <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6">
+        <div
+          className={
+            variant === "page"
+              ? "dashboard-main-scroll min-h-0 flex-1 space-y-6 overscroll-y-contain px-0 py-6"
+              : "min-h-0 flex-1 space-y-6 overflow-y-auto p-6"
+          }
+        >
           {rows.map((row, i) =>
             row.role === 'user' ? (
               <div key={i} className="flex gap-3 justify-end">
@@ -741,17 +830,26 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
                 key={i}
                 run={row.run}
                 isLiveStreaming={busy && i === rows.length - 1}
+                showInlineReflexionBanner={
+                  busy &&
+                  i === rows.length - 1 &&
+                  row.run.segments.length > 0 &&
+                  shouldShowReflexionBanner(
+                    row.run.segments,
+                    busy && i === rows.length - 1,
+                  )
+                }
               />
             ),
           )}
 
           {showStreamConnecting && (
             <div className="flex gap-3 justify-start">
-              <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                 <Bot size={16} className="text-blue-400" />
               </div>
-              <div className="bg-white/5 border border-white/10 rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-2 text-gray-400 text-sm">
-                <Loader2 size={14} className="animate-spin" /> Connexion au flux…
+              <div className="min-w-0 flex-1 max-w-[85%]">
+                <ReflexionStatusRow />
               </div>
             </div>
           )}
@@ -764,7 +862,11 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
             role="dialog"
             aria-modal="true"
             aria-labelledby="approval-tool-title"
-            className="shrink-0 mx-4 mb-3 rounded-xl border border-amber-400/45 bg-gradient-to-b from-amber-950/40 to-black/35 px-4 py-4 shadow-lg shadow-amber-900/20"
+            className={
+              variant === "page"
+                ? "mb-3 shrink-0 rounded-xl border border-amber-400/45 bg-gradient-to-b from-amber-950/40 to-black/35 px-4 py-4 shadow-lg shadow-amber-900/20"
+                : "mx-4 mb-3 shrink-0 rounded-xl border border-amber-400/45 bg-gradient-to-b from-amber-950/40 to-black/35 px-4 py-4 shadow-lg shadow-amber-900/20"
+            }
           >
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0">
@@ -823,7 +925,13 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
           </div>
         )}
 
-        <div className="p-4 border-t border-white/10 shrink-0">
+        <div
+          className={
+            variant === "page"
+              ? "shrink-0 border-t border-white/10 px-0 py-4"
+              : "shrink-0 border-t border-white/10 p-4"
+          }
+        >
           <div className="flex gap-3 items-end">
             <textarea
               value={input}
@@ -926,9 +1034,12 @@ function RunSegmentBlock({ seg, j }: { seg: RunSegment; j: number }) {
 function AssistantAnswerBlock({
   run,
   isLiveStreaming,
+  showInlineReflexionBanner,
 }: {
   run: AssistantRun;
   isLiveStreaming: boolean;
+  /** Bandeau « Réflexion… » pendant le tour LLM quand le flux n’a pas encore de bloc planning/reasoning actif. */
+  showInlineReflexionBanner?: boolean;
 }) {
   const [reflectionOpen, setReflectionOpen] = useState(isLiveStreaming);
   const prevLiveRef = useRef(isLiveStreaming);
@@ -952,6 +1063,7 @@ function AssistantAnswerBlock({
         <Bot size={16} className="text-blue-400" />
       </div>
       <div className="max-w-[85%] min-w-0 flex-1 space-y-3">
+        {showInlineReflexionBanner ? <ReflexionStatusRow subtle /> : null}
         {hideReflection ? (
           <>
             <button
@@ -1065,9 +1177,20 @@ function PlanningCard({ segment }: { segment: PlanningSegment }) {
           )}
         </div>
         <p className="text-xs text-slate-500 mt-1.5 pl-[1.35rem] leading-relaxed">
-          {waiting
-            ? `Résumé / intention du modèle (tour ${turnLabel})…`
-            : `Plan ou résumé haut niveau (tour ${turnLabel}). Nouveau tour LLM → archivé ci‑dessous.`}
+          {waiting ? (
+            <span className="inline-flex items-center gap-2 flex-wrap">
+              <span>
+                Résumé / intention du modèle (tour {turnLabel})
+              </span>
+              <span className="reflexion-dots inline-flex items-center translate-y-px" aria-hidden>
+                <span />
+                <span />
+                <span />
+              </span>
+            </span>
+          ) : (
+            `Plan ou résumé haut niveau (tour ${turnLabel}). Nouveau tour LLM → archivé ci‑dessous.`
+          )}
         </p>
       </div>
       <button
@@ -1136,16 +1259,25 @@ function ReasoningCard({ segment }: { segment: ReasoningSegment }) {
         <div className="text-[13px] font-medium text-slate-200/95 flex items-center gap-2 flex-wrap">
           <Brain size={15} className="text-cyan-400 shrink-0" />
           <span className="text-slate-300">
-            Exploring{segment.subagent ? ` · ${segment.subagent}` : ''}
+            Réflexion{segment.subagent ? ` · ${segment.subagent}` : ''}
           </span>
           {segment.streaming && (
             <Loader2 size={14} className="animate-spin text-cyan-400/80 ml-auto shrink-0" />
           )}
         </div>
         <p className="text-xs text-slate-500 leading-relaxed pl-[1.4rem]">
-          {waiting
-            ? 'En attente du flux de réflexion détaillée (le plan haut niveau est dans le bloc « Planning » au‑dessus, si le modèle l’expose).'
-            : `Raisonnement en direct (tour ${turnLabel}). Nouveau tour LLM → ce bloc est archivé et repart vide.`}
+          {waiting ? (
+            <span className="inline-flex items-center gap-2 flex-wrap">
+              <span>Mise en forme du raisonnement détaillé</span>
+              <span className="reflexion-dots inline-flex items-center translate-y-px" aria-hidden>
+                <span />
+                <span />
+                <span />
+              </span>
+            </span>
+          ) : (
+            `Raisonnement en direct (tour ${turnLabel}). Nouveau tour LLM → ce bloc est archivé et repart vide.`
+          )}
         </p>
       </div>
       <button

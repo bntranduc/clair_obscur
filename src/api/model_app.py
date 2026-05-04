@@ -26,8 +26,11 @@ _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")
 if load_dotenv is not None:
     load_dotenv(os.path.join(_REPO_ROOT, ".env"), override=False)
 
+from api.agent_catalog import build_agent_catalog  # noqa: E402
+from api.agentic_bridge import _repo_root  # noqa: E402
 from api.agentic_router import router as agentic_router  # noqa: E402
 from api.chat_router import router as chat_router  # noqa: E402
+from backend.agentic.config.loader import load_config  # noqa: E402
 from backend.model.bedrock_client import MODEL_ID_DEFAULT
 from backend.model.predict import predict_alerts
 
@@ -43,6 +46,12 @@ app.add_middleware(
 )
 app.include_router(chat_router)
 app.include_router(agentic_router)
+
+
+@app.get(f"{API_V1}/agents/catalog")
+def agents_catalog_alias() -> dict[str, Any]:
+    """Même contenu que ``GET /api/v1/agentic/catalog`` (alias si proxy / ancien routage)."""
+    return build_agent_catalog(load_config(_repo_root()))
 
 
 class InlineAwsCredentials(BaseModel):

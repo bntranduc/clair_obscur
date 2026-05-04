@@ -7,5 +7,9 @@ export const metadata: Metadata = {
 };
 
 export default function ChatPage() {
-  return <AgenticChatAssistant />;
+  return (
+    <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden">
+      <AgenticChatAssistant />
+    </div>
+  );
 }

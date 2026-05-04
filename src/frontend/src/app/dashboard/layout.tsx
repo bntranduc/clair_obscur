@@ -176,7 +176,13 @@ export default function DashboardLayout({
         <div className="dashboard-tactical-sweep pointer-events-none absolute inset-0" aria-hidden />
         <div className="pointer-events-none absolute inset-0 grid-overlay" aria-hidden />
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain px-5 pb-5 pt-[4.25rem] sm:px-6 sm:pb-6 sm:pt-[4.5rem] lg:px-8 lg:pb-8 lg:pt-[4.75rem]">
+          <div
+            className={
+              isChatPage
+                ? "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden overscroll-y-contain px-0 pb-0 pt-0"
+                : "flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-y-contain px-5 pb-5 pt-[2.125rem] sm:px-6 sm:pb-6 sm:pt-[2.25rem] lg:px-8 lg:pb-8 lg:pt-[2.375rem]"
+            }
+          >
             {children}
           </div>
         </div>

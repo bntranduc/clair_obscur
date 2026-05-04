@@ -6,10 +6,19 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from api.agentic_bridge import iter_agentic_sse
+from api.agentic_bridge import _repo_root, iter_agentic_sse
+from api.agent_catalog import build_agent_catalog
+from backend.agentic.config.loader import load_config
 from backend.agentic.safety.web_approval import resolve as resolve_web_approval
 
 router = APIRouter(prefix="/api/v1/agentic", tags=["agentic"])
+
+
+@router.get("/catalog")
+async def get_agentic_catalog():
+    """Liste l’agent principal, les sous-agents et les métadonnées d’outils (pour l’UI Paramètres)."""
+    cfg = load_config(_repo_root())
+    return build_agent_catalog(cfg)
 
 
 class AgenticStreamRequest(BaseModel):
