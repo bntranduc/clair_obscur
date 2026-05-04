@@ -93,7 +93,7 @@ class Config(BaseModel):
     hooks_enabled: bool = False
     hooks: list[HookConfig] = Field(default_factory=list)
     approval: ApprovalPolicy = ApprovalPolicy.ON_REQUEST
-    max_turns: int = 100
+    max_turns: int = 40
     mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)
 
     allowed_tools: list[str] | None = Field(

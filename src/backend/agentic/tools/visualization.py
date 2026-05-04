@@ -22,7 +22,7 @@ class KPIItem(BaseModel):
 
 
 class ChartSpec(BaseModel):
-    kind: Literal["none", "bar", "line", "histogram"] = "none"
+    kind: Literal["none", "bar", "line", "histogram", "pie"] = "none"
     category_key: str | None = Field(
         default=None,
         description="Colonne catégorielle (bar / histogramme sur bins textuels)",
@@ -142,6 +142,23 @@ def _sample_keys(rows: list[dict[str, Any]], max_scan: int = 400) -> set[str]:
     return keys
 
 
+def _wants_pie_chart(request_lower: str) -> bool:
+    needles = (
+        "pie chart",
+        "pie-chart",
+        "graphique en secteurs",
+        "diagramme circulaire",
+        "diagramme en camembert",
+        "camembert",
+        "tarte",
+        "donut",
+        "secteurs",
+        "répartition circulaire",
+        "repartition circulaire",
+    )
+    return any(n in request_lower for n in needles)
+
+
 def _wants_bar_chart(request_lower: str) -> bool:
     needles = (
         "barplot",
@@ -164,14 +181,9 @@ def _wants_bar_chart(request_lower: str) -> bool:
     return any(n in request_lower for n in needles)
 
 
-def _infer_direct_bar_plan(request: str, rows: list[dict[str, Any]]) -> VizPlan | None:
-    """Cas fréquent SOC : barplot « nombre de logs par type » sans passer par le LLM."""
-    if not rows or not _wants_bar_chart(request.lower()):
-        return None
-
+def _infer_category_key_for_effectifs(request: str, keys: set[str]) -> str | None:
+    """Colonne catégorielle pour effectifs (bar / pie rapides)."""
     req = request.lower()
-    keys = _sample_keys(rows)
-
     category_key: str | None = None
     if any(
         p in req
@@ -203,6 +215,55 @@ def _infer_direct_bar_plan(request: str, rows: list[dict[str, Any]]) -> VizPlan 
         "par type" in req or "type de" in req or "logs par" in req
     ):
         category_key = "log_source"
+    return category_key
+
+
+def _infer_direct_pie_plan(request: str, rows: list[dict[str, Any]]) -> VizPlan | None:
+    """Camembert / pie chart des effectifs par catégorie (sans LLM)."""
+    if not rows or not _wants_pie_chart(request.lower()):
+        return None
+    keys = _sample_keys(rows)
+    category_key = _infer_category_key_for_effectifs(request, keys)
+    if category_key is None:
+        return None
+    limit = 25
+    labs, vals = _aggregate_bar_counts(rows, category_key, limit)
+    if not labs:
+        return None
+
+    total = len(rows)
+    distinct = len(labs)
+    title = (
+        "Répartition par type (log_source)"
+        if category_key == "log_source"
+        else f"Répartition par {category_key}"
+    )
+    kpis = [
+        KPIItem(label="Logs dans l’échantillon", value=total),
+        KPIItem(label="Secteurs affichés", value=distinct),
+        KPIItem(label="Part dominante", value=f"{labs[0]} ({int(vals[0])})"),
+    ]
+    chart = ChartSpec(kind="pie", category_key=category_key, value_key=None, limit=limit)
+    notes = (
+        f"Diagramme circulaire : surface ∝ **nombre de lignes** par `{category_key}`. "
+        "Demande détectée comme pie chart d’effectifs (chemin rapide, sans LLM)."
+    )
+    return VizPlan(
+        title=title,
+        subtitle="Vue agrégée — terminal",
+        kpis=kpis,
+        chart=chart,
+        markdown_notes=notes,
+    )
+
+
+def _infer_direct_bar_plan(request: str, rows: list[dict[str, Any]]) -> VizPlan | None:
+    """Cas fréquent SOC : barplot « nombre de logs par type » sans passer par le LLM."""
+    if not rows or not _wants_bar_chart(request.lower()):
+        return None
+
+    keys = _sample_keys(rows)
+    category_key = _infer_category_key_for_effectifs(request, keys)
 
     if category_key is None:
         return None
@@ -232,6 +293,18 @@ def _infer_direct_bar_plan(request: str, rows: list[dict[str, Any]]) -> VizPlan 
         chart=chart,
         markdown_notes=notes,
     )
+
+
+def _ascii_pie_table(labels: list[str], values: list[float], title: str) -> str:
+    """Répartition en pourcentages (repli terminal sans plotext.pie)."""
+    if not values:
+        return "(pas de données pour le camembert)"
+    total = sum(values) or 1.0
+    lines = [f"## {title}", ""]
+    for lb, v in zip(labels, values):
+        pct = 100.0 * float(v) / total
+        lines.append(f"- **{lb}** — {pct:.1f}% ({v:g})")
+    return "\n".join(lines)
 
 
 def _configure_plotext_style(plt: Any) -> None:
@@ -319,6 +392,27 @@ def _render_chart_plotext(
                 pass
             return plt.build()
 
+        if ch.kind == "pie":
+            if not ch.category_key:
+                return ""
+            labs, vals = _aggregate_bar_counts(rows, ch.category_key, ch.limit)
+            if not labs:
+                return "(pie vide)"
+            pie_fn = getattr(plt, "pie", None)
+            if not callable(pie_fn):
+                return ""
+            try:
+                pie_fn(vals, labels=labs)
+            except TypeError:
+                try:
+                    pie_fn(labels, vals)
+                except Exception:
+                    return ""
+            except Exception:
+                return ""
+            plt.title(title)
+            return plt.build()
+
         if ch.kind == "histogram":
             vk = ch.value_key or ch.category_key
             if not vk:
@@ -388,6 +482,11 @@ def _render_chart_fallback(plan: VizPlan, rows: list[dict[str, Any]]) -> str:
         else:
             labs, vals = _aggregate_bar_counts(rows, ch.category_key, ch.limit)
         return _ascii_bars(labs, vals, plan.title)
+    if ch.kind == "pie":
+        if not ch.category_key:
+            return ""
+        labs, vals = _aggregate_bar_counts(rows, ch.category_key, ch.limit)
+        return _ascii_pie_table(labs, vals, plan.title)
     if ch.kind == "histogram":
         vk = ch.value_key or ch.category_key
         if not vk:
@@ -464,6 +563,28 @@ def _build_web_chart_payload(plan: VizPlan, rows: list[dict[str, Any]]) -> dict[
         data = [{"name": str(lab)[:120], "value": float(val)} for lab, val in zip(labs, vals)]
         return {
             "kind": "bar",
+            "title": title,
+            "subtitle": subtitle,
+            "xLabel": ch.category_key,
+            "yLabel": y_label,
+            "data": data,
+            "kpis": kpis_web,
+        }
+
+    if ch.kind == "pie":
+        if not ch.category_key:
+            return None
+        if ch.value_key:
+            labs, vals = _aggregate_bar_sum(rows, ch.category_key, ch.value_key, ch.limit)
+            y_label = f"Σ {ch.value_key}"
+        else:
+            labs, vals = _aggregate_bar_counts(rows, ch.category_key, ch.limit)
+            y_label = "Effectif"
+        if not labs:
+            return None
+        data = [{"name": str(lab)[:120], "value": float(val)} for lab, val in zip(labs, vals)]
+        return {
+            "kind": "pie",
             "title": title,
             "subtitle": subtitle,
             "xLabel": ch.category_key,
@@ -562,8 +683,8 @@ Réponds avec UN SEUL objet JSON (sans markdown) au schéma :
   "subtitle": "string ou null",
   "kpis": [ {"label": "...", "value": "nombre ou texte", "trend": "up"|"down"|"flat"|null} ],
   "chart": {
-    "kind": "none"|"bar"|"line"|"histogram",
-    "category_key": "nom de colonne pour barres (ex. severity, log_source, action)",
+    "kind": "none"|"bar"|"line"|"histogram"|"pie",
+    "category_key": "nom de colonne pour barres / camembert (ex. severity, log_source, action)",
     "value_key": "nom de colonne numérique ou null pour compter les lignes",
     "x_key": "pour line si colonne temps/catégorie ordonnée, sinon null",
     "limit": nombre entre 2 et 25 (max catégories / points affichés)
@@ -574,8 +695,9 @@ Réponds avec UN SEUL objet JSON (sans markdown) au schéma :
 Règles :
 - Colonne « type de log » / « type de logs » dans une demande française = **`log_source`** (valeurs application | authentication | network | system).
 - « Barplot / diagramme en barres du nombre de logs par type » ⇒ chart.kind = **bar**, category_key = **log_source**, value_key = **null** (compter les lignes).
+- « Pie chart / camembert / diagramme circulaire » des effectifs par catégorie ⇒ chart.kind = **pie**, category_key = le champ, value_key = **null** (ou somme si value_key numérique).
 - Si aucune donnée tabulaire n’est fournie : kpis génériques et chart.kind = "none" ; invite à charger des événements.
-- Répartition par champ catégoriel : bar, category_key = ce champ, value_key null.
+- Répartition par champ catégoriel : **bar** ou **pie** (camembert), category_key = ce champ, value_key null.
 - Somme par catégorie : bar, category_key + value_key numérique.
 - Distribution d’une métrique continue : histogram sur value_key numérique.
 - Titres et labels en français si la demande est en français.
@@ -590,7 +712,7 @@ class VisualizationFromPromptTool(Tool):
 
     name = "visualization_from_prompt"
     description = (
-        "Crée KPIs (markdown) + graphique terminal coloré (plotext : barres/ligne/histogramme). "
+        "Crée KPIs (markdown) + graphique terminal coloré (plotext : barres/ligne/histogramme/camembert). "
         "Pour « barplot du nombre de logs par type », charge d’abord les événements puis passe leur JSON dans "
         "`data_json` et une phrase du type « barplot par type de logs, nombre de logs » — colonne type = `log_source`."
     )
@@ -610,7 +732,9 @@ class VisualizationFromPromptTool(Tool):
             except json.JSONDecodeError as e:
                 return ToolResult.error_result(f"data_json invalide : {e}")
 
-        plan = _infer_direct_bar_plan(p.visualization_request, rows)
+        plan = _infer_direct_pie_plan(p.visualization_request, rows)
+        if plan is None:
+            plan = _infer_direct_bar_plan(p.visualization_request, rows)
         direct_bar = plan is not None
         if plan is None:
             preview = _preview_columns(rows)

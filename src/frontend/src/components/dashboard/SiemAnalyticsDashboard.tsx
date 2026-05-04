@@ -66,6 +66,43 @@ function formatHourLabel(iso: string): string {
   }
 }
 
+/** Axe X DynamoDB : date + heure en UTC, ordre lexicographique = ordre chrono. */
+function formatDynamoHourAxisLabel(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return new Intl.DateTimeFormat("fr-FR", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "UTC",
+    })
+      .format(d)
+      .replace(/\s/g, " ");
+  } catch {
+    return iso;
+  }
+}
+
+function formatDynamoMinuteAxisLabel(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return new Intl.DateTimeFormat("fr-FR", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "UTC",
+    })
+      .format(d)
+      .replace(/\s/g, " ");
+  } catch {
+    return iso;
+  }
+}
+
 function formatInt(n: number): string {
   return new Intl.NumberFormat("fr-FR").format(Math.round(n));
 }
@@ -76,6 +113,28 @@ function formatAnalyticsRange(sinceIso: string, untilIso: string): string {
     return `${df.format(new Date(sinceIso))} → ${df.format(new Date(untilIso))}`;
   } catch {
     return `${sinceIso} → ${untilIso}`;
+  }
+}
+
+function formatAnalyticsInstant(iso: string): string {
+  try {
+    const df = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "medium" });
+    return df.format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
+function formatAnalyticsInstantUtc(iso: string): string {
+  try {
+    const df = new Intl.DateTimeFormat("fr-FR", {
+      dateStyle: "short",
+      timeStyle: "medium",
+      timeZone: "UTC",
+    });
+    return `${df.format(new Date(iso))} UTC`;
+  } catch {
+    return iso;
   }
 }
 
@@ -139,11 +198,13 @@ function KpiCard({
 function Panel({
   title,
   subtitle,
+  headerAside,
   children,
   className = "",
 }: {
   title: string;
   subtitle?: string;
+  headerAside?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -151,9 +212,12 @@ function Panel({
     <div
       className={`rounded-2xl border border-white/[0.08] bg-zinc-900/35 p-5 ring-1 ring-white/[0.04] ${className}`}
     >
-      <div className="mb-4">
-        <h2 className="text-[13px] font-semibold tracking-tight text-white">{title}</h2>
-        {subtitle ? <p className="mt-0.5 text-[12px] text-zinc-500">{subtitle}</p> : null}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-[13px] font-semibold tracking-tight text-white">{title}</h2>
+          {subtitle ? <p className="mt-0.5 text-[12px] text-zinc-500">{subtitle}</p> : null}
+        </div>
+        {headerAside ? <div className="shrink-0">{headerAside}</div> : null}
       </div>
       {children}
     </div>
@@ -211,35 +275,58 @@ function SiemDashboardView({
   data,
   onRefresh,
   refreshing,
+  dynamoTimelineBucket,
+  onDynamoTimelineBucketChange,
 }: {
   data: SiemDashboard;
   onRefresh: () => void;
   refreshing: boolean;
+  dynamoTimelineBucket?: "hour" | "minute";
+  onDynamoTimelineBucketChange?: (bucket: "hour" | "minute") => void;
 }) {
+  const isDynamo = data.data_source === "dynamodb";
+  const timelineGranularity: "hour" | "minute" =
+    data.dynamodb_timeline_granularity === "minute" ? "minute" : "hour";
   const gradId = `siemArea-${data.data_source}`;
+  const sortedTimeline =
+    isDynamo && data.timeline.length > 0
+      ? [...data.timeline].sort((a, b) => a.t.localeCompare(b.t))
+      : data.timeline;
   const timelineChart =
-    data.timeline.length > 0
-      ? data.timeline.map((p) => ({
-          label: formatHourLabel(p.t),
+    sortedTimeline.length > 0
+      ? sortedTimeline.map((p) => ({
+          label: isDynamo
+            ? timelineGranularity === "minute"
+              ? formatDynamoMinuteAxisLabel(p.t)
+              : formatDynamoHourAxisLabel(p.t)
+            : formatHourLabel(p.t),
+          hourKey: p.t,
           count: p.count,
         }))
-      : [{ label: "—", count: 0 }];
+      : [{ label: "—", count: 0, hourKey: "" }];
+  const tiltDynamoAxis =
+    isDynamo &&
+    (timelineGranularity === "minute"
+      ? sortedTimeline.length > 6
+      : sortedTimeline.length > 8);
 
   const geoLogs: SiemGeoLogPoint[] = data.geo_logs ?? EMPTY_GEO_LOGS;
-  const isDynamo = data.data_source === "dynamodb";
   const fixedRange =
     typeof data.time_filter_since === "string" &&
     data.time_filter_since.length > 0 &&
     typeof data.time_filter_until === "string" &&
     data.time_filter_until.length > 0;
   const rangeLine = fixedRange ? formatAnalyticsRange(data.time_filter_since!, data.time_filter_until!) : null;
+  const fetchedCount = data.dynamodb_items_fetched ?? data.dynamodb_items_scanned ?? data.total_events;
   const volumeSub = isDynamo
-    ? `${data.dynamodb_items_scanned?.toLocaleString("fr-FR") ?? formatInt(data.total_events)} évén. lus${
-        rangeLine ? ` · ${rangeLine}` : " · partition courte"
-      }`
+    ? rangeLine
+      ? `${formatInt(fetchedCount)} chargés (max) · ${formatInt(data.total_events)} après filtre timestamp · ${rangeLine}`
+      : `${formatInt(fetchedCount)} derniers logs DynamoDB — agrégations sur tout l’échantillon`
     : rangeLine
       ? `Plage : ${rangeLine}`
       : `${data.time_range_hours} h glissantes`;
+  const tsFirst = data.dynamodb_sample_timestamp_first?.trim();
+  const tsLast = data.dynamodb_sample_timestamp_last?.trim();
 
   return (
     <div className="flex flex-col gap-8">
@@ -266,6 +353,33 @@ function SiemDashboardView({
           {data.dynamodb_truncated ? (
             <span className="text-amber-400/90"> · échantillon tronqué (limite max_items)</span>
           ) : null}
+        </p>
+      ) : null}
+
+      {isDynamo && tsFirst && tsLast ? (
+        <div className="rounded-xl border border-violet-400/35 bg-gradient-to-r from-violet-950/50 to-zinc-900/40 px-4 py-3 ring-1 ring-violet-500/25">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-200/95">
+            Timestamps des logs (échantillon affiché)
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-white/[0.08] bg-black/25 px-3 py-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-400/90">Premier</p>
+              <p className="mt-1 font-mono text-sm font-medium text-white">{formatAnalyticsInstant(tsFirst)}</p>
+              <p className="mt-0.5 font-mono text-[10px] text-zinc-500">{tsFirst}</p>
+            </div>
+            <div className="rounded-lg border border-white/[0.08] bg-black/25 px-3 py-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-400/90">Dernier</p>
+              <p className="mt-1 font-mono text-sm font-medium text-white">{formatAnalyticsInstant(tsLast)}</p>
+              <p className="mt-0.5 font-mono text-[10px] text-zinc-500">{tsLast}</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isDynamo && data.total_events === 0 && rangeLine ? (
+        <p className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2 text-[12px] text-amber-100/90">
+          Aucun log dont le <code className="text-amber-200/90">timestamp</code> ne tombe dans la période parmi les{" "}
+          <span className="font-mono tabular-nums">{formatInt(fetchedCount)}</span> derniers enregistrements chargés.
         </p>
       ) : null}
 
@@ -308,14 +422,56 @@ function SiemDashboardView({
         title="Chronologie du volume"
         subtitle={
           isDynamo
-            ? "Histogramme par heure (agrégation en mémoire sur l’échantillon DynamoDB)"
+            ? timelineGranularity === "minute"
+              ? "Courbe par minute UTC (agrégation en mémoire sur l’échantillon DynamoDB, ordre chrono)"
+              : "Courbe par heure UTC (agrégation en mémoire sur l’échantillon DynamoDB, ordre chrono)"
             : "Histogramme par heure — corrélation incidents et charge"
+        }
+        headerAside={
+          isDynamo && onDynamoTimelineBucketChange ? (
+            <div
+              className="inline-flex rounded-lg border border-white/[0.12] bg-black/35 p-0.5"
+              role="group"
+              aria-label="Granularité de la chronologie"
+            >
+              <button
+                type="button"
+                onClick={() => onDynamoTimelineBucketChange("hour")}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold transition ${
+                  (dynamoTimelineBucket ?? "hour") === "hour"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                Heure
+              </button>
+              <button
+                type="button"
+                onClick={() => onDynamoTimelineBucketChange("minute")}
+                className={`rounded-md px-3 py-1.5 text-[11px] font-semibold transition ${
+                  (dynamoTimelineBucket ?? "hour") === "minute"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                Minute
+              </button>
+            </div>
+          ) : undefined
         }
         className="min-h-[320px]"
       >
-        <div className="h-[280px] w-full min-w-0">
+        <div className={isDynamo && tiltDynamoAxis ? "h-[320px] w-full min-w-0" : "h-[280px] w-full min-w-0"}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={timelineChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <AreaChart
+              data={timelineChart}
+              margin={{
+                top: 8,
+                right: 8,
+                left: 0,
+                bottom: isDynamo && tiltDynamoAxis ? 44 : 0,
+              }}
+            >
               <defs>
                 <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.35} />
@@ -325,16 +481,29 @@ function SiemDashboardView({
               <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fill: "#71717a", fontSize: 10 }}
+                tick={{ fill: "#71717a", fontSize: isDynamo ? 9 : 10 }}
                 tickLine={false}
                 axisLine={{ stroke: "rgba(255,255,255,0.08)" }}
-                interval="preserveStartEnd"
+                interval={isDynamo && tiltDynamoAxis ? 0 : "preserveStartEnd"}
+                angle={isDynamo && tiltDynamoAxis ? -38 : 0}
+                textAnchor={isDynamo && tiltDynamoAxis ? "end" : "middle"}
+                height={isDynamo && tiltDynamoAxis ? 62 : undefined}
               />
-              <YAxis tick={{ fill: "#71717a", fontSize: 10 }} tickLine={false} axisLine={false} width={44} />
+              <YAxis
+                tick={{ fill: "#71717a", fontSize: 10 }}
+                tickLine={false}
+                axisLine={false}
+                width={isDynamo ? 52 : 44}
+              />
               <Tooltip
                 contentStyle={{ background: "#09090b", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8 }}
                 labelStyle={{ color: "#a1a1aa" }}
-                formatter={(v) => [formatInt(Number(v ?? 0)), "Événements"]}
+                formatter={(v) => [formatInt(Number(v ?? 0)), isDynamo ? "Logs" : "Événements"]}
+                labelFormatter={(label, payload) => {
+                  if (!isDynamo) return label;
+                  const hk = (payload?.[0]?.payload as { hourKey?: string } | undefined)?.hourKey;
+                  return hk ? formatAnalyticsInstantUtc(hk) : String(label ?? "");
+                }}
               />
               <Area
                 type="monotone"
@@ -472,7 +641,7 @@ function SiemDashboardView({
       <p className="flex items-center justify-center gap-2 text-center text-[11px] text-zinc-600">
         <Network size={12} aria-hidden />
         {isDynamo
-          ? "Agrégations calculées côté API sur un échantillon DynamoDB (Query par pk, tronqué à max_items)."
+          ? "Agrégations côté API : lecture des 15 000 derniers éléments de la partition (max), puis filtre période sur le timestamp du log si défini."
           : "Agrégations OpenSearch — rafraîchissement automatique 30 s."}
       </p>
     </div>
@@ -493,6 +662,7 @@ export default function SiemAnalyticsDashboard() {
   const [sinceInput, setSinceInput] = useState("");
   const [untilInput, setUntilInput] = useState("");
   const [timeFilterErr, setTimeFilterErr] = useState<string | null>(null);
+  const [dynamoTimelineBucket, setDynamoTimelineBucket] = useState<"hour" | "minute">("hour");
 
   const loadSiem = useCallback(async () => {
     setSiemErr(null);
@@ -515,10 +685,10 @@ export default function SiemAnalyticsDashboard() {
     setDynamoErr(null);
     setLoadingDynamo(true);
     try {
-      const d = await fetchDynamodbAnalytics(
-        8000,
-        rangeIso ? { since: rangeIso.since, until: rangeIso.until } : undefined,
-      );
+      const d = await fetchDynamodbAnalytics(15_000, {
+        ...(rangeIso ? { since: rangeIso.since, until: rangeIso.until } : {}),
+        timelineGranularity: dynamoTimelineBucket,
+      });
       setDynamoData(d);
     } catch (e) {
       setDynamoErr(e instanceof Error ? e.message : "Erreur de chargement");
@@ -526,7 +696,7 @@ export default function SiemAnalyticsDashboard() {
     } finally {
       setLoadingDynamo(false);
     }
-  }, [rangeIso]);
+  }, [rangeIso, dynamoTimelineBucket]);
 
   useEffect(() => {
     void loadDynamo();
@@ -577,8 +747,9 @@ export default function SiemAnalyticsDashboard() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Analytics</h1>
           <p className="mt-1 max-w-2xl text-[15px] leading-relaxed text-zinc-400">
-            <strong className="font-medium text-zinc-300">Général</strong> : métriques et graphiques à partir d’un
-            échantillon DynamoDB. <strong className="font-medium text-zinc-300">SIEM</strong> : vue OpenSearch
+            <strong className="font-medium text-zinc-300">Général</strong> : métriques sur les 15 000 derniers logs
+            DynamoDB (max), puis filtre par période sur le <code className="text-zinc-400">timestamp</code> du log.{" "}
+            <strong className="font-medium text-zinc-300">SIEM</strong> : vue OpenSearch
             24&nbsp;h (ou plage personnalisée ci‑dessous).
           </p>
         </div>
@@ -638,7 +809,9 @@ export default function SiemAnalyticsDashboard() {
           </p>
         ) : (
           <p className="mt-3 text-[12px] text-zinc-600">
-            Sans filtre : DynamoDB lit l’échantillon le plus récent ; SIEM utilise les 24&nbsp;h glissantes OpenSearch.
+            Sans filtre : DynamoDB charge les 15 000 derniers enregistrements de la partition (max) ; avec filtre : les
+            mêmes lignes sont réduites en mémoire selon le <code className="text-zinc-500">timestamp</code> du log. SIEM : 24&nbsp;h
+            glissantes OpenSearch.
           </p>
         )}
       </section>
@@ -691,7 +864,15 @@ export default function SiemAnalyticsDashboard() {
         </div>
       ) : null}
 
-      {activeData ? <SiemDashboardView data={activeData} onRefresh={() => void activeLoad()} refreshing={activeLoading} /> : null}
+      {activeData ? (
+        <SiemDashboardView
+          data={activeData}
+          onRefresh={() => void activeLoad()}
+          refreshing={activeLoading}
+          dynamoTimelineBucket={dynamoTimelineBucket}
+          onDynamoTimelineBucketChange={setDynamoTimelineBucket}
+        />
+      ) : null}
     </div>
   );
 }

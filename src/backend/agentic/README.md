@@ -15,6 +15,7 @@ An AI agent that can execute tasks using tools and manage conversations.
 
 - `classify_firewall_log`, pipeline S3/SQL (`fetch_normalized_logs_from_s3`, sous-agents, etc.) — voir `tools/registry.py`
 - Sous-agent **remédiation IR** : `subagent_remediation_soc` — plan contain/eradicate/recover et vérifications, avec outils de lecture optionnels (`tools/remediation_subagent.py`)
+- Sous-agent **MITRE** : `subagent_mitre_simple` — référence ATT&CK via web (`web_search` / `web_fetch` uniquement, `tools/mitre_subagent.py`)
 - Classification firewall : règles déterministes BUG / ATTACK / NORMAL (port ESGI `cyber_agentic`)
 
 ### Built-in Tools (template générique)

@@ -27,14 +27,17 @@ class WebSearchTool(Tool):
                 params.query,
                 region="us-en",
                 safesearch="off",
-                timelimit="y",
+                timelimit=None,
                 page=1,
                 backend="auto",
+                max_results=params.max_results,
             )
         except Exception as e:
             return ToolResult.error_result(f"Search failed: {e}")
 
-        if not results:
+        rows = list(results)
+
+        if not rows:
             return ToolResult.success_result(
                 f"No results found for: {params.query}",
                 metadata={
@@ -44,7 +47,7 @@ class WebSearchTool(Tool):
 
         output_lines = [f"Search results for: {params.query}"]
 
-        for i, result in enumerate(results, start=1):
+        for i, result in enumerate(rows, start=1):
             output_lines.append(f"{i}. Title: {result['title']}")
             output_lines.append(f"   URL: {result['href']}")
             if result.get("body"):
@@ -55,6 +58,6 @@ class WebSearchTool(Tool):
         return ToolResult.success_result(
             "\n".join(output_lines),
             metadata={
-                "results": len(results),
+                "results": len(rows),
             },
         )

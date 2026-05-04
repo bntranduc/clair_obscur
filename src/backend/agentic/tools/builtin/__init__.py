@@ -26,9 +26,11 @@ __all__ = [
 
 
 def get_all_builtin_tools() -> list[type]:
-    """Outils « agent IDE » — conservés dans le code comme modèle ; non branchés au SIEM.
+    """Outils « agent IDE » — la plupart ne sont pas branchés au SIEM.
 
-    Réactiver en les listant ici et en décommentant l’enregistrement dans
+    ``WebSearchTool`` / ``WebFetchTool`` sont enregistrés dans
+    ``create_default_registry`` ; le reste demeure un modèle. Pour tout activer,
+    lister ici et décommenter l’enregistrement bulk dans
     ``tools.registry.create_default_registry`` :
 
     # return [

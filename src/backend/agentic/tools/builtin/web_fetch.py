@@ -11,7 +11,7 @@ class WebFetchParams(BaseModel):
         30,
         ge=5,
         le=120,
-        description="Request timeout in seconds (default: 120)",
+        description="Request timeout in seconds (default: 30)",
     )
 
 

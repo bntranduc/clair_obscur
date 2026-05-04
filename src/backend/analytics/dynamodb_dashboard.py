@@ -11,6 +11,9 @@ from boto3.dynamodb.conditions import Key
 
 from backend.aws.dynamodb_normalized_logs import _aws_session, _jsonify_for_api, default_logs_partition_key
 
+# Plafond ``max_items`` : aligné avec ``Query(..., le=…)`` sur ``GET /api/v1/analytics/dynamodb``.
+DYNAMODB_ANALYTICS_MAX_ITEMS_CAP = 15_000
+
 
 def _parse_ts(ts: str | None) -> datetime | None:
     if not ts or not isinstance(ts, str):
@@ -28,40 +31,60 @@ def _hour_bucket_utc(ts: str | None) -> str:
     return d.strftime("%Y-%m-%dT%H:00:00.000Z")
 
 
-def _sk_exclusive_upper(until_iso: str) -> str | None:
-    """Borne supérieure exclusive sur ``sk`` (tri lexicographique = ordre temporel pour nos ISO)."""
-    d = _parse_ts(until_iso.strip())
+def _minute_bucket_utc(ts: str | None) -> str:
+    d = _parse_ts(ts)
     if d is None:
-        return None
-    d2 = d + timedelta(milliseconds=1)
-    return d2.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        return ""
+    d = d.astimezone(timezone.utc).replace(second=0, microsecond=0)
+    return d.strftime("%Y-%m-%dT%H:%M:00.000Z")
 
 
-def _query_all_events(
+def _timeline_bucket_key(ts: str | None, granularity: str) -> str:
+    if granularity == "minute":
+        return _minute_bucket_utc(ts)
+    return _hour_bucket_utc(ts)
+
+
+def _filter_events_by_log_timestamp(
+    events: list[dict[str, Any]],
+    since_iso: str | None,
+    until_iso: str | None,
+) -> list[dict[str, Any]]:
+    """Filtre en mémoire sur ``event.timestamp`` (ISO). Inclusif sur ``since`` et ``until``."""
+    s_f = (since_iso or "").strip()
+    u_f = (until_iso or "").strip()
+    if not s_f and not u_f:
+        return events
+    s_dt = _parse_ts(s_f) if s_f else None
+    u_dt = _parse_ts(u_f) if u_f else None
+    out: list[dict[str, Any]] = []
+    for ev in events:
+        ts = ev.get("timestamp")
+        d = _parse_ts(ts) if isinstance(ts, str) else None
+        if d is None:
+            continue
+        if s_dt is not None and d < s_dt:
+            continue
+        if u_dt is not None and d > u_dt:
+            continue
+        out.append(ev)
+    return out
+
+
+def _query_partition_recent(
     *,
     pk: str,
     max_items: int,
     region: str,
     table: str,
-    since: str | None = None,
-    until: str | None = None,
 ) -> tuple[list[dict[str, Any]], bool]:
-    """Lit jusqu’à ``max_items`` événements (tri ``sk`` décroissant = plus récents d’abord)."""
+    """Lit jusqu’à ``max_items`` événements récents (``pk`` seul, tri ``sk`` décroissant)."""
     session = _aws_session(region)
     tbl = session.resource("dynamodb", region_name=region).Table(table)
     out: list[dict[str, Any]] = []
     lek: dict[str, Any] | None = None
     truncated = False
-
-    s = (since or "").strip()
-    u = (until or "").strip()
     key_expr = Key("pk").eq(pk)
-    if s:
-        key_expr = key_expr & Key("sk").gte(s)
-    if u:
-        ub = _sk_exclusive_upper(u)
-        if ub:
-            key_expr = key_expr & Key("sk").lt(ub)
 
     while len(out) < max_items:
         batch = min(1000, max_items - len(out))
@@ -91,32 +114,40 @@ def _query_all_events(
 def get_dynamodb_dashboard(
     *,
     pk: str | None = None,
-    max_items: int = 5000,
+    max_items: int = 15_000,
     region: str | None = None,
     table_name: str | None = None,
     since: str | None = None,
     until: str | None = None,
+    timeline_granularity: str = "hour",
 ) -> dict[str, Any]:
-    """Construit un objet compatible ``SiemDashboard`` (champ ``data_source``: ``dynamodb``)."""
+    """Construit un objet compatible ``SiemDashboard`` (champ ``data_source``: ``dynamodb``).
+
+    Lit jusqu’à ``max_items`` lignes récentes sur la partition, applique ensuite un filtre optionnel
+    sur le champ ``timestamp`` de chaque log (``since`` / ``until`` inclusifs).
+    """
     reg = (region or os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "eu-west-3").strip()
     table = (table_name or os.getenv("DYNAMODB_TABLE", "normalized-logs")).strip()
     pk_resolved = (pk or "").strip() or default_logs_partition_key()
-    cap = max(100, min(int(max_items), 15_000))
+    cap = max(100, min(int(max_items), DYNAMODB_ANALYTICS_MAX_ITEMS_CAP))
     s_f = (since or "").strip()
     u_f = (until or "").strip()
+    gran = (timeline_granularity or "hour").strip().lower()
+    if gran not in ("hour", "minute"):
+        gran = "hour"
 
-    events, truncated = _query_all_events(
+    events, truncated = _query_partition_recent(
         pk=pk_resolved,
         max_items=cap,
         region=reg,
         table=table,
-        since=s_f or None,
-        until=u_f or None,
     )
+    dynamodb_items_fetched = len(events)
+    events = _filter_events_by_log_timestamp(events, s_f or None, u_f or None)
 
     total = len(events)
     by_source = Counter()
-    by_hour: Counter[str] = Counter()
+    by_timeline: Counter[str] = Counter()
     by_ip = Counter()
     auth_status = Counter()
     protocols = Counter()
@@ -132,9 +163,9 @@ def get_dynamodb_dashboard(
         by_source[ls_s] += 1
         ts = ev.get("timestamp")
         if isinstance(ts, str):
-            hb = _hour_bucket_utc(ts)
-            if hb:
-                by_hour[hb] += 1
+            bk = _timeline_bucket_key(ts, gran)
+            if bk:
+                by_timeline[bk] += 1
             d = _parse_ts(ts)
             if d:
                 parsed_times.append(d)
@@ -193,6 +224,14 @@ def get_dynamodb_dashboard(
         except (TypeError, ValueError, OSError):
             pass
 
+    ts_first: str | None = None
+    ts_last: str | None = None
+    if parsed_times:
+        mn = min(parsed_times)
+        mx = max(parsed_times)
+        ts_first = mn.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+        ts_last = mx.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "time_range_hours": hours_window,
@@ -209,8 +248,12 @@ def get_dynamodb_dashboard(
         "geo_logs": geo_logs,
         "data_source": "dynamodb",
         "dynamodb_pk": pk_resolved,
-        "dynamodb_items_scanned": total,
+        "dynamodb_items_fetched": dynamodb_items_fetched,
+        "dynamodb_items_scanned": dynamodb_items_fetched,
         "dynamodb_truncated": truncated,
+        "dynamodb_sample_timestamp_first": ts_first,
+        "dynamodb_sample_timestamp_last": ts_last,
+        "dynamodb_timeline_granularity": gran,
         "time_filter_since": s_f or None,
         "time_filter_until": u_f or None,
     }

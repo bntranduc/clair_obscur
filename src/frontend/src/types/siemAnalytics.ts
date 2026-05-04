@@ -32,8 +32,15 @@ export type SiemDashboard = {
   data_source: "opensearch" | "demo" | "dynamodb";
   /** Renseigné quand ``data_source === "dynamodb"``. */
   dynamodb_pk?: string;
+  /** Lignes lues sur DynamoDB (avant filtre période sur ``timestamp``). */
+  dynamodb_items_fetched?: number;
   dynamodb_items_scanned?: number;
   dynamodb_truncated?: boolean;
+  /** Min / max des ``timestamp`` de logs dans l’échantillon affiché (après filtre). */
+  dynamodb_sample_timestamp_first?: string | null;
+  dynamodb_sample_timestamp_last?: string | null;
+  /** Agrégation de la série ``timeline`` (DynamoDB uniquement). */
+  dynamodb_timeline_granularity?: "hour" | "minute";
   /** Fenêtre explicite si l’API a reçu ``since`` + ``until``. */
   time_filter_since?: string | null;
   time_filter_until?: string | null;

@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Any
 
@@ -73,6 +74,21 @@ def _merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, An
     return result
 
 
+def _apply_agentic_env_overrides(config: Config) -> None:
+    """Surcharges déploiement (``.env`` / variables système) après TOML — priorité à l’env.
+
+    - ``AGENTIC_MAX_TURNS`` : plafond de tours outil/réponse (entier 1–500).
+    """
+    raw_mt = (os.environ.get("AGENTIC_MAX_TURNS") or "").strip()
+    if raw_mt:
+        try:
+            n = int(raw_mt, 10)
+            if 1 <= n <= 500:
+                config.max_turns = n
+        except ValueError:
+            logger.warning("AGENTIC_MAX_TURNS invalide (%s), ignoré.", raw_mt)
+
+
 def load_config(cwd: Path | None) -> Config:
     cwd = cwd or Path.cwd()
 
@@ -107,4 +123,5 @@ def load_config(cwd: Path | None) -> Config:
     except Exception as e:
         raise ConfigError(f"Invalid configuration: {e}") from e
 
+    _apply_agentic_env_overrides(config)
     return config

@@ -63,6 +63,12 @@ def assess_tool_step(
 
     tname = tool_name.lower()
 
+    if tname in {"web_search", "web_fetch"}:
+        return PlanRiskAssessment(
+            level=RiskLevel.LOW,
+            rationale="Lecture / recherche web publique (pas d’écriture côté SIEM).",
+        )
+
     if tname in {"shell", "run_terminal_cmd", "bash"}:
         reasons.append("Exécution de commande shell.")
         cmd = str((params or {}).get("command") or confirmation.command or "")

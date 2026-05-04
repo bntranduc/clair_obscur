@@ -729,7 +729,7 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
           {rows.map((row, i) =>
             row.role === 'user' ? (
               <div key={i} className="flex gap-3 justify-end">
-                <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap bg-blue-700 text-white rounded-br-md">
+                <div className="max-w-[75%] rounded-2xl rounded-br-md border border-blue-800/35 bg-blue-950/65 px-4 py-3 text-sm whitespace-pre-wrap text-slate-200">
                   {row.content}
                 </div>
                 <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center flex-shrink-0">

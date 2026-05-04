@@ -31,7 +31,7 @@ export default function Home() {
 
           <div className="mt-12 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Link
-              href="/dashboard/logs"
+              href="/dashboard"
               className="group focus-ring inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-3.5 text-sm font-semibold text-zinc-950 shadow-lg shadow-blue-500/10 transition hover:bg-zinc-100 hover:shadow-blue-500/20"
             >
               Ouvrir le tableau de bord

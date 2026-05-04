@@ -132,11 +132,13 @@ export type FetchDynamodbAnalyticsOptions = {
   region?: string;
   since?: string;
   until?: string;
+  /** ``hour`` ou ``minute`` — agrégation UTC de la chronologie. */
+  timelineGranularity?: "hour" | "minute";
 };
 
 /** Agrégations sur un échantillon DynamoDB (même ``pk`` / env que les logs). */
 export async function fetchDynamodbAnalytics(
-  maxItems: number = 8000,
+  maxItems: number = 15_000,
   options?: FetchDynamodbAnalyticsOptions,
 ): Promise<SiemDashboard> {
   const sp = new URLSearchParams();
@@ -148,6 +150,8 @@ export async function fetchDynamodbAnalytics(
   const until = options?.until?.trim();
   if (since) sp.set("since", since);
   if (until) sp.set("until", until);
+  const tg = options?.timelineGranularity;
+  if (tg === "hour" || tg === "minute") sp.set("timeline_granularity", tg);
   const q = sp.toString();
   const url = `${getApiUrl()}/api/v1/analytics/dynamodb${q ? `?${q}` : ""}`;
   const res = await fetch(url, apiFetchInit);

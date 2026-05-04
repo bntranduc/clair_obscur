@@ -16,7 +16,10 @@ from backend.agentic.tools.logs_table_sql import BuildSqlForLogsTableTool, RunSq
 from backend.agentic.tools.s3_normalized_logs import FetchNormalizedLogsFromS3Tool
 from backend.agentic.tools.subagents import SubagentTool, get_logs_pipeline_subagent_definitions
 from backend.agentic.tools.remediation_subagent import get_remediation_subagent_definitions
+from backend.agentic.tools.mitre_subagent import get_mitre_subagent_definitions
 from backend.agentic.tools.visualization import VisualizationFromPromptTool, get_visualization_subagent_definitions
+from backend.agentic.tools.builtin.web_fetch import WebFetchTool
+from backend.agentic.tools.builtin.web_search import WebSearchTool
 
 logger = logging.getLogger(__name__)
 
@@ -196,8 +199,12 @@ def create_default_registry(config: Config) -> ToolRegistry:
       ``run_sql_on_logs_table``, sous-agents ``subagent_s3_normalized_logs`` et ``subagent_logs_table_sql``.
     - Visualisation : ``visualization_from_prompt``, sous-agent ``subagent_visualization_specialist``.
     - Remédiation IR : ``subagent_remediation_soc`` (plan contain/eradicate/recover, outils lecture).
+    - Web public : ``web_search`` (DuckDuckGo), ``web_fetch`` (GET HTTP/HTTPS, corps tronqué).
+    - MITRE : ``subagent_mitre_simple`` (référence ATT&CK via web uniquement).
     """
     registry = ToolRegistry(config)
+    registry.register(WebSearchTool(config))
+    registry.register(WebFetchTool(config))
     registry.register(ClassifyFirewallLogTool(config))
     registry.register(FetchNormalizedLogsFromS3Tool(config))
     registry.register(BuildSqlForLogsTableTool(config))
@@ -208,5 +215,7 @@ def create_default_registry(config: Config) -> ToolRegistry:
     for sub_def in get_visualization_subagent_definitions():
         registry.register(SubagentTool(config, sub_def))
     for sub_def in get_remediation_subagent_definitions():
+        registry.register(SubagentTool(config, sub_def))
+    for sub_def in get_mitre_subagent_definitions():
         registry.register(SubagentTool(config, sub_def))
     return registry

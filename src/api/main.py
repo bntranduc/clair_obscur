@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
@@ -19,7 +19,10 @@ from backend.aws.dynamodb_normalized_logs import (  # noqa: E402
     fetch_normalized_page_from_dynamodb,
 )
 from backend.aws.s3.logs import fetch_normalized_page  # noqa: E402
-from backend.analytics.dynamodb_dashboard import get_dynamodb_dashboard  # noqa: E402
+from backend.analytics.dynamodb_dashboard import (  # noqa: E402
+    DYNAMODB_ANALYTICS_MAX_ITEMS_CAP,
+    get_dynamodb_dashboard,
+)
 from backend.analytics.siem import get_siem_dashboard  # noqa: E402
 from api.agentic_router import router as agentic_router  # noqa: E402
 from api.chat_router import router as chat_router  # noqa: E402
@@ -181,13 +184,23 @@ def siem_analytics(
 
 @app.get(f"{API_V1}/analytics/dynamodb")
 def analytics_dynamodb(
-    max_items: int = Query(8000, ge=100, le=15_000),
+    max_items: int = Query(15_000, ge=100, le=DYNAMODB_ANALYTICS_MAX_ITEMS_CAP),
     pk: str | None = Query(None, description="Partition DynamoDB ; sinon env / défaut (cf. logs DynamoDB)."),
     region: str | None = Query(None, description="Région AWS."),
-    since: str | None = Query(None, description="ISO 8601 — avec « until », filtre la clé de tri ``sk`` (timestamp)."),
-    until: str | None = Query(None, description="ISO 8601 — borne haute incluse (clé ``sk`` < until + 1 ms)."),
+    since: str | None = Query(
+        None,
+        description="ISO 8601 — avec « until », filtre en mémoire sur ``timestamp`` du log (après chargement de ``max_items`` lignes).",
+    ),
+    until: str | None = Query(
+        None,
+        description="ISO 8601 — borne haute inclusive sur ``timestamp`` du log (après chargement de ``max_items`` lignes).",
+    ),
+    timeline_granularity: Literal["hour", "minute"] = Query(
+        "hour",
+        description="Agrégation de la chronologie : ``hour`` (par heure UTC) ou ``minute`` (par minute UTC).",
+    ),
 ) -> dict[str, Any]:
-    """Métriques et séries à partir d’un échantillon Query sur une partition ``pk`` (identifiants côté serveur)."""
+    """Métriques et séries : lecture des ``max_items`` derniers éléments de la partition, puis filtre période optionnel."""
     pk_resolved = (
         (pk or "").strip()
         or os.getenv("DYNAMODB_LOGS_PK", "").strip()
@@ -202,6 +215,7 @@ def analytics_dynamodb(
             region=(region or "").strip() or None,
             since=s,
             until=u,
+            timeline_granularity=timeline_granularity,
         )
     except (ClientError, BotoCoreError) as e:
         raise HTTPException(status_code=502, detail=str(e)) from e

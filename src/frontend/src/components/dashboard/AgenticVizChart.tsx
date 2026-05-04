@@ -5,8 +5,11 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -16,7 +19,7 @@ import {
 export type AgenticChartRow = { name: string; value: number | null };
 
 export type AgenticToolChartPayload = {
-  kind: "bar" | "line" | "histogram";
+  kind: "bar" | "line" | "histogram" | "pie";
   title: string;
   subtitle?: string | null;
   xLabel: string;
@@ -60,7 +63,7 @@ export function parseAgenticChartPayload(meta: unknown): AgenticToolChartPayload
   if (!chart || typeof chart !== "object" || Array.isArray(chart)) return null;
   const c = chart as Record<string, unknown>;
   const kind = c.kind;
-  if (kind !== "bar" && kind !== "line" && kind !== "histogram") return null;
+  if (kind !== "bar" && kind !== "line" && kind !== "histogram" && kind !== "pie") return null;
   if (typeof c.title !== "string") return null;
   if (typeof c.xLabel !== "string" || typeof c.yLabel !== "string") return null;
   if (!Array.isArray(c.data) || c.data.length === 0) return null;
@@ -106,7 +109,8 @@ export function AgenticVizChart({ payload }: { payload: AgenticToolChartPayload 
   const barData =
     payload.kind === "line"
       ? payload.data
-      : (payload.data.filter((d): d is { name: string; value: number } => d.value !== null));
+      : payload.data.filter((d): d is { name: string; value: number } => d.value !== null);
+  const pieShowLabels = payload.kind === "pie" && barData.length > 0 && barData.length <= 10;
 
   return (
     <div className="rounded-xl border border-cyan-500/25 bg-gradient-to-b from-zinc-900/80 to-black/40 overflow-hidden">
@@ -131,7 +135,13 @@ export function AgenticVizChart({ payload }: { payload: AgenticToolChartPayload 
         </div>
       ) : null}
 
-      <div className="p-4 h-[280px] w-full min-w-0">
+      <div
+        className={
+          payload.kind === "pie"
+            ? "p-4 h-[min(360px,52vh)] min-h-[300px] w-full min-w-0"
+            : "p-4 h-[280px] w-full min-w-0"
+        }
+      >
         <ResponsiveContainer width="100%" height="100%">
           {payload.kind === "line" ? (
             <LineChart data={payload.data} margin={{ top: 8, right: 12, left: 0, bottom: longTicks ? 48 : 8 }}>
@@ -160,6 +170,49 @@ export function AgenticVizChart({ payload }: { payload: AgenticToolChartPayload 
                 activeDot={{ r: 5 }}
               />
             </LineChart>
+          ) : payload.kind === "pie" ? (
+            <PieChart margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+              <Pie
+                data={barData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={52}
+                outerRadius={96}
+                paddingAngle={2}
+                stroke="rgba(0,0,0,0.35)"
+                strokeWidth={1}
+                label={
+                  pieShowLabels
+                    ? ({ name, percent }) =>
+                        `${formatTick(String(name))} ${percent !== undefined ? (percent * 100).toFixed(0) : ""}%`
+                    : false
+                }
+              >
+                {barData.map((_, i) => (
+                  <Cell key={`pie-${i}`} fill={BAR_COLORS[i % BAR_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={TOOLTIP_STYLE}
+                formatter={(value, _name, item) => {
+                  const v = typeof value === "number" ? value : Number(value);
+                  const pl = item?.payload as { name?: string } | undefined;
+                  const nm = pl?.name != null ? String(pl.name) : "";
+                  return [
+                    Number.isFinite(v) ? v.toLocaleString("fr-FR") : String(value ?? ""),
+                    nm || payload.yLabel,
+                  ];
+                }}
+              />
+              <Legend
+                verticalAlign="bottom"
+                layout="horizontal"
+                wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                formatter={(value) => <span className="text-zinc-400">{formatTick(String(value))}</span>}
+              />
+            </PieChart>
           ) : (
             <BarChart data={barData} margin={{ top: 8, right: 12, left: 0, bottom: longTicks ? 52 : 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
@@ -188,7 +241,7 @@ export function AgenticVizChart({ payload }: { payload: AgenticToolChartPayload 
         </ResponsiveContainer>
       </div>
       <p className="px-4 pb-3 text-[10px] text-zinc-600">
-        Graphique dynamique (Recharts) — même famille que l’onglet Analytics.
+        Graphique dynamique (Recharts : barres, ligne, histogramme, camembert) — même famille que l’onglet Analytics.
       </p>
     </div>
   );
