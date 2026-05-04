@@ -15,6 +15,14 @@ DEFAULT_ALLOWED_ATTACK_TYPES: tuple[str, ...] = (
     "directory_traversal",
     "ssrf",
     "exfiltration",
+    "reconnaissance",
+    "lfi_rfi",
+    "credential_dumping",
+    "log4shell",
+    "sensitive_file_disclosure",
+    "lfi_to_rce",
+    "log4shell_rce",
+    "credential_exfiltration",
 )
 
 # Niveaux de criticité classiques (SIEM) — valeur exacte à reproduire dans ``severity``.

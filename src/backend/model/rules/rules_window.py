@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, TypedDict
 from urllib.parse import unquote
 
+import numpy as np
+
 from backend.log.normalization.types import NormalizedEvent
 
 
@@ -162,6 +164,29 @@ NIKTO_UA_REGEX = re.compile(r"nikto", re.I)
 # THC-Hydra User-Agent — présent selon la version/config
 HYDRA_UA_REGEX = re.compile(r"hydra", re.I)
 
+# Scanners de vulnérabilités (Nessus, OpenVAS, Qualys, Acunetix, Burp Suite)
+# Source : ModSecurity CRS REQUEST-913-SCANNER-DETECTION
+SCANNER_UA_REGEX = re.compile(
+    r"nessus(?:sd|d)?|openvas(?:sd)?|qualys(?:scan)?|acunetix(?:-asp)?|burp[\s/]?suite|burp/\d",
+    re.I,
+)
+_SCANNER_TOOL_MAP: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"nessus",   re.I), "nessus"),
+    (re.compile(r"openvas",  re.I), "openvas"),
+    (re.compile(r"qualys",   re.I), "qualys"),
+    (re.compile(r"acunetix", re.I), "acunetix"),
+    (re.compile(r"burp",     re.I), "burpsuite"),
+]
+
+
+def _scanner_tool_name(ua: str) -> str | None:
+    if not SCANNER_UA_REGEX.search(ua):
+        return None
+    for rx, name in _SCANNER_TOOL_MAP:
+        if rx.search(ua):
+            return name
+    return "unknown_scanner"
+
 # Endpoints login ciblés par les brute forcers HTTP
 LOGIN_URI_REGEX = re.compile(
     r"/login|/signin|/admin|/wp-admin|/wp-login\.php"
@@ -190,6 +215,129 @@ EXFIL_TOOL_REGEXES: list[tuple[str, str]] = [
     (r"curl\s+.*\.ssh",             "CURL_SSH_DIR"),
     (r"wget\s+.*\/etc\/",           "WGET_ETC"),
 ]
+
+# OWASP WSTG-INPV-11/12 — LFI / RFI (PHP wrappers, dangerous schemes, absolute sensitive paths)
+LFI_RFI_REGEX = re.compile(
+    r"php://(?:input|filter|fd|memory|temp|data)"
+    r"|file://|expect://|data://|zip://|phar://|glob://"
+    r"|\.\./.*\.(php|ini|conf|log|bak)"
+    r"|/etc/passwd|/etc/shadow|/proc/self|/var/log"
+    r"|http://\d{1,3}(?:\.\d{1,3}){3}.*\.(php|txt)",
+    re.I,
+)
+_LFI_RFI_WRAPPER_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"php://",    re.I), "php://"),
+    (re.compile(r"file://",   re.I), "file://"),
+    (re.compile(r"expect://", re.I), "expect://"),
+    (re.compile(r"data://",   re.I), "data://"),
+    (re.compile(r"zip://",    re.I), "zip://"),
+    (re.compile(r"phar://",   re.I), "phar://"),
+    (re.compile(r"glob://",   re.I), "glob://"),
+    (re.compile(r"/etc/passwd",  re.I), "/etc/passwd"),
+    (re.compile(r"/etc/shadow",  re.I), "/etc/shadow"),
+    (re.compile(r"/proc/self",   re.I), "/proc/self"),
+    (re.compile(r"/var/log",     re.I), "/var/log"),
+    (re.compile(r"http://\d{1,3}(?:\.\d{1,3}){3}", re.I), "http://IP (RFI)"),
+]
+
+
+def _lfi_rfi_matched_wrappers(uri: str) -> list[str]:
+    decoded = _safe_unquote(uri)
+    combined = uri + " " + decoded
+    return list(dict.fromkeys(
+        name for rx, name in _LFI_RFI_WRAPPER_PATTERNS if rx.search(combined)
+    ))
+
+
+# MITRE ATT&CK T1003 — OS Credential Dumping (all sub-techniques)
+CRED_DUMP_REGEXES: list[tuple[str, str]] = [
+    (r"cat\s+/etc/shadow",                    "CAT_SHADOW"),
+    (r"cat\s+/etc/passwd",                    "CAT_PASSWD"),
+    (r"\bunshadow\b",                         "UNSHADOW"),
+    (r"\bjohn\s+\S",                          "JOHN_THE_RIPPER"),
+    (r"\bhashcat\b",                          "HASHCAT"),
+    (r"\bmimikatz\b",                         "MIMIKATZ"),
+    (r"secretsdump",                          "SECRETSDUMP"),
+    (r"\bhashdump\b",                         "HASHDUMP"),
+    (r"/proc/\d+/mem",                        "PROC_MEM"),
+    (r"\blsass\b",                            "LSASS"),
+    (r"credentials\.db",                      "CREDENTIALS_DB"),
+    (r"\.aws/credentials",                    "AWS_CREDENTIALS"),
+    (r"\.ssh/id_rsa",                         "SSH_PRIVKEY"),
+    (r"dump.*hash|hash.*dump",                "DUMP_HASH"),
+    (r"ntds\.dit",                            "NTDS_DIT"),
+    (r"sam\s+dump|reg\s+save\s+hklm[/\\]sam", "SAM_DUMP"),
+    (r"procdump.*lsass",                      "PROCDUMP_LSASS"),
+]
+
+
+# CVE-2021-44228 — Log4Shell (MITRE ATT&CK T1190)
+LOG4SHELL_REGEX = re.compile(
+    r"\$\{jndi:(?:ldap|ldaps|rmi|dns|iiop|corba|nds|http)s?://"
+    r"|\$\{[^}]*\$\{"      # nested expressions (bypass WAF)
+    r"|\$\{lower:"         # case-bypass variants
+    r"|\$\{upper:"
+    r"|\$\{::-"            # separator-bypass
+    r"|\$\{env\."
+    r"|%24%7[Bb]jndi"      # URL-encoded ${jndi
+    r"|%2524%257[Bb]jndi"  # double URL-encoded
+    r"|\$\{.*://",         # generic scheme injection
+    re.I,
+)
+_LOG4SHELL_CALLBACK_RE = re.compile(
+    r"jndi:[^/]*://([^/:}\s]+)(?::(\d+))?",
+    re.I,
+)
+
+
+def _log4shell_scan_fields(e: "NormalizedEvent") -> tuple[bool, str, str]:
+    """Scan uri, user_agent, referer for Log4Shell payloads.
+    Returns (matched, field_name, raw_value).
+    """
+    for field in ("uri", "user_agent", "referer"):
+        val = e.get(field) or ""  # type: ignore[call-overload]
+        if not val:
+            continue
+        if LOG4SHELL_REGEX.search(val) or LOG4SHELL_REGEX.search(_safe_unquote(val)):
+            return True, field, val
+    return False, "", ""
+
+
+# MITRE ATT&CK T1083 / T1552.001 — Sensitive file direct access
+# Sources: SecLists sensitive-files.txt / ModSecurity CRS RESPONSE-950-DATA-LEAKAGES
+SENSITIVE_FILE_REGEX = re.compile(
+    r"\.git/(?:config|HEAD|COMMIT_EDITMSG|packed-refs)"
+    r"|\.env(?:\.|$)"
+    r"|\.aws/credentials"
+    r"|\.ssh/(?:id_rsa|id_ed25519|authorized_keys)"
+    r"|wp-config\.php|configuration\.php"
+    r"|config\.(?:inc|yml|yaml|json|xml|php)"
+    r"|database\.yml|secrets\.yml"
+    r"|\.htpasswd|\.htaccess|web\.config|applicationhost\.config"
+    r"|backup\.(?:sql|zip|tar|gz|tgz|bak|dump)"
+    r"|dump\.(?:sql|zip)"
+    r"|db\.(?:sql|sqlite|bak)"
+    r"|\bphpinfo\b|server-status|server-info"
+    r"|/proc/self/environ|/etc/passwd|/etc/shadow"
+    r"|actuator/(?:env|beans|mappings|trace|heapdump)"
+    r"|console/?$|elmah\.axd|trace\.axd",
+    re.I,
+)
+_SENSITIVE_FILE_CATEGORIES: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"\.git/|\.svn/",                                    re.I), "vcs_metadata"),
+    (re.compile(r"\.aws/|\.ssh/|\.htpasswd",                         re.I), "credentials"),
+    (re.compile(r"backup\.|dump\.|\.bak|\.dump",                     re.I), "backup"),
+    (re.compile(r"actuator/|phpinfo|server-status|server-info",      re.I), "infra_disclosure"),
+    (re.compile(r"\.env|config\.|database\.yml|secrets\.yml|web\.config", re.I), "app_config"),
+]
+
+
+def _sensitive_file_category(uri: str) -> str:
+    for rx, cat in _SENSITIVE_FILE_CATEGORIES:
+        if rx.search(uri):
+            return cat
+    return "other"
+
 
 SQLI_REGEXES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"union\s+(all\s+)?select",                   re.I), "UNION SELECT"),
@@ -242,9 +390,39 @@ def _sqli_match_reason(uri: str, user_agent: str = "") -> str | None:
     return None
 
 
+def adaptive_threshold(
+    values: list[int],
+    fixed_min: int,
+    percentile: float = 99.0,
+    min_above_fixed: int = 5,
+) -> tuple[int, str]:
+    """Return (effective_threshold, mode_label).
+
+    effective_threshold = max(fixed_min, percentile(values, p)) when the guard
+    condition is met; otherwise fixed_min is returned unchanged.
+
+    Guard: adaptive raise only applies when ≥ min_above_fixed IPs already exceed
+    fixed_min. If fewer IPs exceed it they are likely genuine attackers (not normal
+    high-volume traffic), so the fixed threshold is kept to preserve recall.
+
+    mode_label is "fixed" when the guard prevented a raise, "adaptive_p<N>" otherwise.
+    """
+    if len(values) < 2:
+        return fixed_min, "fixed"
+    above = sum(1 for v in values if v >= fixed_min)
+    if above < min_above_fixed:
+        return fixed_min, "fixed"
+    p = int(np.percentile(values, percentile))
+    eff = max(fixed_min, p)
+    mode = f"adaptive_p{int(percentile)}" if eff > fixed_min else "fixed"
+    return eff, mode
+
+
 def detect_signals_window_1h(
     events: Iterable[NormalizedEvent],
     *,
+    use_adaptive_thresholds: bool = True,
+    adaptive_percentile: float = 99.0,
     # credential stuffing / spray
     cs_failures_threshold: int = 100,
     cs_distinct_users_threshold: int = 10,
@@ -298,7 +476,14 @@ def detect_signals_window_1h(
     http_bruteforce_window_sec: int = 900,
     # IDOR & exfil tools
     idor_threshold: int = 10,
+    idor_distinct_ids_threshold: int = 5,  # min distinct numeric IDs to qualify as enumeration
     exfil_tool_threshold: int = 1,
+    # LFI / RFI
+    lfi_rfi_min_hits: int = 3,
+    # credential dump (system)
+    cred_dump_threshold: int = 1,
+    # Log4Shell
+    log4shell_threshold: int = 1,
 ) -> list[Signal]:
     """Deterministic detections on a 1-hour window (MVP).
 
@@ -400,6 +585,22 @@ def detect_signals_window_1h(
     # --- IDOR hits grouped by (source_ip, hostname) ---
     idor_hits: dict[tuple[str, str], list[tuple[str | None, str]]] = defaultdict(list)  # [(ts, uri)]
 
+    # --- Security scanner UA hits grouped by (source_ip, hostname) ---
+    # (ts, uri, ua, http_method, status_code)
+    scanner_ua_hits: dict[tuple[str, str], list[tuple[str | None, str, str, str, int | None]]] = defaultdict(list)
+
+    # --- LFI/RFI hits grouped by (source_ip, hostname) ---
+    lfi_rfi_hits: dict[tuple[str, str], list[tuple[str | None, str, int | None]]] = defaultdict(list)  # (ts, uri, status_code)
+
+    # --- Credential dump hits grouped by hostname ---
+    cred_dump_by_host: dict[str, list[tuple[str | None, str, str, int | None]]] = defaultdict(list)  # (ts, message, matched_pattern, pid)
+
+    # --- Log4Shell hits grouped by (source_ip, hostname) ---
+    log4shell_hits: dict[tuple[str, str], list[tuple[str | None, str, str, str]]] = defaultdict(list)  # (ts, raw_payload, field_name, uri)
+
+    # --- Sensitive file access hits grouped by (source_ip, hostname) ---
+    sensitive_file_hits: dict[tuple[str, str], list[tuple[str | None, str, int | None]]] = defaultdict(list)  # (ts, uri, status_code)
+
     # --- Exfil tool hits grouped by hostname ---
     exfil_tool_by_host: dict[str, list[tuple[str | None, str, str]]] = defaultdict(list)  # [(ts, msg, reason)]
 
@@ -466,6 +667,11 @@ def detect_signals_window_1h(
                 hydra_ua_hits[src].append((ts, uri, ua))
                 if host and src not in hydra_ua_hostname:
                     hydra_ua_hostname[src] = host
+            # Vulnerability scanner UA (Nessus, OpenVAS, Qualys, Acunetix, Burp Suite)
+            scanner_tool = _scanner_tool_name(ua)
+            if scanner_tool and host:
+                method = (e.get("http_method") or "").upper()
+                scanner_ua_hits[(src, host)].append((ts, uri, ua, method, e.get("status_code")))
             # Directory bruteforce — volume of 404 from same (ip, host)
             if e.get("status_code") == 404 and host:
                 dir_bruteforce_hits[(src, host)].append((ts, uri))
@@ -479,6 +685,10 @@ def detect_signals_window_1h(
             # IDOR — GET 200 on API endpoints with numeric IDs
             if IDOR_URI_REGEX.search(uri) and e.get("status_code") == 200 and host:
                 idor_hits[(src, host)].append((ts, uri))
+            # Log4Shell — scan uri, user_agent, referer
+            log4j_matched, log4j_field, log4j_raw = _log4shell_scan_fields(e)
+            if log4j_matched and host:
+                log4shell_hits[(src, host)].append((ts, log4j_raw, log4j_field, uri))
             # SSRF detection
             for m in SSRF_PARAM_RE.finditer(uri + " " + decoded_uri):
                 target_url = m.group(1)
@@ -491,6 +701,14 @@ def detect_signals_window_1h(
                 if host_m and SSRF_INTERNAL_RE.match(host_m.group(1)):
                     ssrf_hits[(src, host)].append((ts, uri, target_url))
                     break
+
+            # LFI / RFI detection
+            if host and (LFI_RFI_REGEX.search(uri) or LFI_RFI_REGEX.search(decoded_uri)):
+                lfi_rfi_hits[(src, host)].append((ts, uri, e.get("status_code")))
+
+            # Sensitive file access (direct path, no traversal needed)
+            if host and SENSITIVE_FILE_REGEX.search(uri):
+                sensitive_file_hits[(src, host)].append((ts, uri, e.get("status_code")))
 
             # Directory traversal detection
             is_traversal_pattern = bool(TRAVERSAL_RE.search(uri) or TRAVERSAL_RE.search(decoded_uri))
@@ -575,10 +793,56 @@ def detect_signals_window_1h(
                     if re.search(pattern, msg, re.IGNORECASE):
                         exfil_tool_by_host[host].append((ts, msg, reason))
                         break
+                for pattern, reason in CRED_DUMP_REGEXES:
+                    if re.search(pattern, msg, re.IGNORECASE):
+                        cred_dump_by_host[host].append((ts, msg, reason, e.get("pid")))
+                        break
+
+    # --- Adaptive thresholds (computed from filled accumulators, no extra pass needed) ---
+    if use_adaptive_thresholds:
+        _p = adaptive_percentile
+        _cs_vals = list(auth_failures_by_ip.values())
+        eff_cs_failures, _cs_mode = adaptive_threshold(_cs_vals, cs_failures_threshold, _p)
+
+        _ssh_vals = [len(v) for v in ssh_failures_by_ip.values()]
+        eff_ssh_failures, _ssh_mode = adaptive_threshold(_ssh_vals, ssh_failures_threshold, _p)
+
+        _dir_counts: Counter[str] = Counter()
+        for (ip, _h), _hits in dir_bruteforce_hits.items():
+            _dir_counts[ip] += len(_hits)
+        eff_dir_bruteforce, _dir_mode = adaptive_threshold(list(_dir_counts.values()), dir_bruteforce_threshold, _p)
+
+        _http_counts: Counter[str] = Counter()
+        for (ip, _h), _hits in http_bruteforce_hits.items():
+            _http_counts[ip] += len(_hits)
+        eff_http_bruteforce, _http_mode = adaptive_threshold(list(_http_counts.values()), http_bruteforce_threshold, _p)
+
+        _sqli_counts: Counter[str] = Counter()
+        for (ip, _h), _hits in sqli_hits.items():
+            _sqli_counts[ip] += len(_hits)
+        eff_sqli_min, _sqli_mode = adaptive_threshold(list(_sqli_counts.values()), sqli_min_hits, _p)
+
+        _ssrf_counts: Counter[str] = Counter()
+        for (ip, _h), _hits in ssrf_hits.items():
+            _ssrf_counts[ip] += len(_hits)
+        eff_ssrf_min, _ssrf_mode = adaptive_threshold(list(_ssrf_counts.values()), ssrf_min_hits, _p)
+
+        _trav_counts: Counter[str] = Counter()
+        for (ip, _h), _hits in traversal_hits.items():
+            _trav_counts[ip] += len(_hits)
+        eff_traversal_min, _trav_mode = adaptive_threshold(list(_trav_counts.values()), traversal_min_hits, _p)
+    else:
+        eff_cs_failures, _cs_mode = cs_failures_threshold, "fixed"
+        eff_ssh_failures, _ssh_mode = ssh_failures_threshold, "fixed"
+        eff_dir_bruteforce, _dir_mode = dir_bruteforce_threshold, "fixed"
+        eff_http_bruteforce, _http_mode = http_bruteforce_threshold, "fixed"
+        eff_sqli_min, _sqli_mode = sqli_min_hits, "fixed"
+        eff_ssrf_min, _ssrf_mode = ssrf_min_hits, "fixed"
+        eff_traversal_min, _trav_mode = traversal_min_hits, "fixed"
 
     def _is_stuffing_ip(ip: str) -> bool:
         fails = auth_failures_by_ip[ip]
-        if fails < cs_failures_threshold:
+        if fails < eff_cs_failures:
             return False
         if len(auth_user_set_by_ip[ip]) < cs_distinct_users_threshold:
             return False
@@ -624,6 +888,9 @@ def detect_signals_window_1h(
                     "iocs": {
                         "failures": int(fails),
                         "distinct_usernames": int(distinct_users),
+                        "threshold_used": eff_cs_failures,
+                        "threshold_mode": _cs_mode,
+                        "threshold_fixed": cs_failures_threshold,
                         "window_seconds": WINDOW_SECONDS,
                     },
                     "evidence_ids": ev_ids,
@@ -700,7 +967,7 @@ def detect_signals_window_1h(
 
     # --- Emit SSH_BRUTEFORCE signals ---
     for ip, dts in ssh_failures_by_ip.items():
-        if len(dts) < ssh_failures_threshold:
+        if len(dts) < eff_ssh_failures:
             # still emit if bursty (human-impossible cadence)
             dts_sorted = sorted(dts)
             burst = False
@@ -725,6 +992,9 @@ def detect_signals_window_1h(
                 "source_ip": ip,
                 "iocs": {
                     "ssh_failures": int(len(dts)),
+                    "threshold_used": eff_ssh_failures,
+                    "threshold_mode": _ssh_mode,
+                    "threshold_fixed": ssh_failures_threshold,
                     "window_seconds": WINDOW_SECONDS,
                     "burst_n": ssh_burst_n,
                     "burst_seconds": ssh_burst_seconds,
@@ -737,7 +1007,7 @@ def detect_signals_window_1h(
         dts = ssh_failures_by_ip.get(ip, [])
         if not dts:
             return False
-        if len(dts) >= ssh_failures_threshold:
+        if len(dts) >= eff_ssh_failures:
             return True
         dts_s = sorted(dts)
         j = 0
@@ -817,6 +1087,7 @@ def detect_signals_window_1h(
     # --- Emit KILL_CHAIN_COMPROMISE_AND_COVER (log tampering post-compromise) ---
     _COMPROMISE_RULES: frozenset[str] = frozenset({
         "SSH_PRIV_ESC", "SSH_LATERAL_MOVE", "WEB_WEBSHELL", "NET_REVERSE_SHELL",
+        "WEB_LOG4SHELL", "WEB_LFI_RFI",
     })
     compromised_hosts: set[str] = {
         s["hostname"] for s in signals
@@ -944,7 +1215,7 @@ def detect_signals_window_1h(
     # --- Emit KILL_CHAIN_SHELL_TO_EXFIL (exfil via curl/wget post-compromise) ---
     _SHELL_RULES: frozenset[str] = frozenset({
         "SSH_PRIV_ESC", "WEB_WEBSHELL", "NET_REVERSE_SHELL",
-        "SYS_BACKDOOR_ACCOUNT", "SYS_PERSISTENCE",
+        "SYS_BACKDOOR_ACCOUNT", "SYS_PERSISTENCE", "SYS_CREDENTIAL_DUMP",
     })
     compromised_hosts_exfil: set[str] = {
         s["hostname"] for s in signals
@@ -1047,7 +1318,7 @@ def detect_signals_window_1h(
 
     # --- Emit SSRF signals ---
     for (ip, host), hits in ssrf_hits.items():
-        if len(hits) < ssrf_min_hits:
+        if len(hits) < eff_ssrf_min:
             continue
         hits_sorted = sorted(hits, key=lambda x: x[0])
         sig_ts = hits_sorted[0][0]
@@ -1079,6 +1350,9 @@ def detect_signals_window_1h(
             "hits": int(len(hits_sorted)),
             "ssrf_targets": target_hosts[:10],
             "sample_uris": [u for _, u, _ in hits_sorted[:5]],
+            "threshold_used": eff_ssrf_min,
+            "threshold_mode": _ssrf_mode,
+            "threshold_fixed": ssrf_min_hits,
             "window_seconds": WINDOW_SECONDS,
         }
         if dangerous_schemes:
@@ -1100,7 +1374,7 @@ def detect_signals_window_1h(
 
     # --- Emit DIRECTORY_TRAVERSAL signals ---
     for (ip, host), hits in traversal_hits.items():
-        if len(hits) < traversal_min_hits:
+        if len(hits) < eff_traversal_min:
             continue
         hits_sorted = sorted(hits, key=lambda x: x[0])
         sig_ts = hits_sorted[0][0]
@@ -1120,6 +1394,9 @@ def detect_signals_window_1h(
                 "successful_reads": int(success_hits),
                 "status_counts": {str(k): v for k, v in status_counts.most_common()},
                 "sample_uris": sample_uris,
+                "threshold_used": eff_traversal_min,
+                "threshold_mode": _trav_mode,
+                "threshold_fixed": traversal_min_hits,
                 "window_seconds": WINDOW_SECONDS,
                 **({"python_requests_ua_hits": int(ua_hits)} if ua_hits else {}),
             },
@@ -1157,7 +1434,7 @@ def detect_signals_window_1h(
 
     # --- Emit SQL_INJECTION signals ---
     for (ip, host), hits in sqli_hits.items():
-        if len(hits) < sqli_min_hits:
+        if len(hits) < eff_sqli_min:
             continue
         hits_sorted = sorted(hits, key=lambda x: x[0])
         sig_ts, _, _ = hits_sorted[0]
@@ -1175,6 +1452,9 @@ def detect_signals_window_1h(
                     "hits": int(len(hits_sorted)),
                     "top_reasons": top_reasons,
                     "sample_uris": top_uris,
+                    "threshold_used": eff_sqli_min,
+                    "threshold_mode": _sqli_mode,
+                    "threshold_fixed": sqli_min_hits,
                     "window_seconds": WINDOW_SECONDS,
                 },
             }
@@ -1405,13 +1685,14 @@ def detect_signals_window_1h(
         for i in range(len(parsed_bf)):
             while (parsed_bf[i][0] - parsed_bf[j][0]).total_seconds() > dir_bruteforce_window_sec:
                 j += 1
-            if i - j + 1 >= dir_bruteforce_threshold:
+            if i - j + 1 >= eff_dir_bruteforce:
                 burst_start = j
                 break
         if burst_start is None:
             continue
         sig_ts = parsed_bf[burst_start][0].isoformat().replace("+00:00", "Z")
         sig_ts_end = parsed_bf[-1][0].isoformat().replace("+00:00", "Z")
+        burst_count = i - burst_start + 1
         signals.append(
             {
                 "rule_id": "WEB_DIR_BRUTEFORCE",
@@ -1421,8 +1702,11 @@ def detect_signals_window_1h(
                 "hostname": hostname,
                 "iocs": {
                     "hits_404": len(parsed_bf),
+                    "burst_count": burst_count,
                     "sample_uris": [u for _, u in parsed_bf[burst_start:burst_start + 10]],
-                    "threshold": dir_bruteforce_threshold,
+                    "threshold_used": eff_dir_bruteforce,
+                    "threshold_mode": _dir_mode,
+                    "threshold_fixed": dir_bruteforce_threshold,
                     "burst_window_sec": dir_bruteforce_window_sec,
                     "window_seconds": WINDOW_SECONDS,
                 },
@@ -1484,6 +1768,7 @@ def detect_signals_window_1h(
             "CREDENTIAL_STUFFING",
             "DIRECTORY_TRAVERSAL", "DIRECTORY_TRAVERSAL_SUCCESS",
             "WEB_WEBSHELL", "SSRF", "NET_REVERSE_SHELL",
+            "WEB_LFI_RFI", "WEB_LOG4SHELL", "WEB_SENSITIVE_FILE_ACCESS",
         })
         already_correlated: set[str] = set()
         for signal in list(signals):
@@ -1528,7 +1813,7 @@ def detect_signals_window_1h(
         for i in range(len(parsed_hbf)):
             while (parsed_hbf[i][0] - parsed_hbf[j][0]).total_seconds() > http_bruteforce_window_sec:
                 j += 1
-            if i - j + 1 >= http_bruteforce_threshold:
+            if i - j + 1 >= eff_http_bruteforce:
                 burst_start = j
                 break
         if burst_start is None:
@@ -1546,7 +1831,9 @@ def detect_signals_window_1h(
                     "hits": len(parsed_hbf),
                     "target_uris": list({u for _, u, _ in parsed_hbf}),
                     "status_codes": list({sc for _, _, sc in parsed_hbf}),
-                    "threshold": http_bruteforce_threshold,
+                    "threshold_used": eff_http_bruteforce,
+                    "threshold_mode": _http_mode,
+                    "threshold_fixed": http_bruteforce_threshold,
                     "window_seconds": http_bruteforce_window_sec,
                 },
             }
@@ -1602,12 +1889,147 @@ def detect_signals_window_1h(
             }
         )
 
+    # --- Emit WEB_SCANNER_UA_DETECTED signals ---
+    for (src_ip, hostname), hits in scanner_ua_hits.items():
+        hits_with_ts = [(t, u, ua, m, sc) for t, u, ua, m, sc in hits if t]
+        sig_ts = min(t for t, *_ in hits_with_ts) if hits_with_ts else "1970-01-01T00:00:00Z"
+        sig_ts_end = max(t for t, *_ in hits_with_ts) if hits_with_ts else sig_ts
+        matched_tool = _scanner_tool_name(hits[0][2]) or "unknown_scanner"
+        uri_sample = list(dict.fromkeys(u for _, u, *_ in hits))[:10]
+        http_methods = sorted({m for _, _, _, m, _ in hits if m})
+        status_codes = sorted({sc for _, _, _, _, sc in hits if sc is not None})
+        signals.append(
+            {
+                "rule_id": "WEB_SCANNER_UA_DETECTED",
+                "ts": sig_ts,
+                "ts_end": sig_ts_end,
+                "source_ip": src_ip,
+                "hostname": hostname,
+                "iocs": {
+                    "matched_tool": matched_tool,
+                    "user_agent_raw": hits[0][2],
+                    "request_count": len(hits),
+                    "uri_sample": uri_sample,
+                    "http_methods": http_methods,
+                    "status_codes_seen": status_codes,
+                    "window_seconds": WINDOW_SECONDS,
+                },
+            }
+        )
+
+    # --- Emit WEB_SENSITIVE_FILE_ACCESS signals ---
+    for (src_ip, hostname), hits in sensitive_file_hits.items():
+        hits_sorted = sorted(hits, key=lambda x: x[0] or "")
+        sig_ts = hits_sorted[0][0] or "1970-01-01T00:00:00Z"
+        sig_ts_end = hits_sorted[-1][0] or sig_ts
+        exposed = [uri for _, uri, sc in hits_sorted if sc == 200]
+        attempted = [uri for _, uri, sc in hits_sorted if sc != 200]
+        categories = list(dict.fromkeys(_sensitive_file_category(u) for _, u, _ in hits_sorted))
+        signals.append(
+            {
+                "rule_id": "WEB_SENSITIVE_FILE_ACCESS",
+                "ts": sig_ts,
+                "ts_end": sig_ts_end,
+                "source_ip": src_ip,
+                "hostname": hostname,
+                "iocs": {
+                    "hits": len(hits_sorted),
+                    "exposed_count": len(exposed),
+                    "has_confirmed_exposure": len(exposed) > 0,
+                    "exposed_uris": list(dict.fromkeys(exposed))[:5],
+                    "attempted_uris": list(dict.fromkeys(attempted))[:5],
+                    "file_categories": categories,
+                    "window_seconds": WINDOW_SECONDS,
+                },
+            }
+        )
+
+    # --- Emit WEB_LFI_RFI signals ---
+    for (src_ip, hostname), hits in lfi_rfi_hits.items():
+        if len(hits) < lfi_rfi_min_hits:
+            continue
+        hits_sorted = sorted(hits, key=lambda x: x[0] or "")
+        sig_ts = hits_sorted[0][0] or "1970-01-01T00:00:00Z"
+        sig_ts_end = hits_sorted[-1][0] or sig_ts
+        uri_samples = list(dict.fromkeys(u for _, u, _ in hits_sorted))[:10]
+        matched_wrappers = list(dict.fromkeys(
+            w for _, u, _ in hits_sorted for w in _lfi_rfi_matched_wrappers(u)
+        ))[:10]
+        status_codes = sorted({sc for _, _, sc in hits_sorted if sc is not None})
+        signals.append(
+            {
+                "rule_id": "WEB_LFI_RFI",
+                "ts": sig_ts,
+                "ts_end": sig_ts_end,
+                "source_ip": src_ip,
+                "hostname": hostname,
+                "iocs": {
+                    "hit_count": len(hits_sorted),
+                    "uri_samples": uri_samples,
+                    "matched_wrappers": matched_wrappers,
+                    "status_codes_seen": status_codes,
+                    "window_seconds": WINDOW_SECONDS,
+                },
+            }
+        )
+
+    # --- Emit SYS_CREDENTIAL_DUMP signals ---
+    for hostname, hits in cred_dump_by_host.items():
+        if len(hits) < cred_dump_threshold:
+            continue
+        hits_sorted = sorted(hits, key=lambda x: x[0] or "")
+        sig_ts = hits_sorted[0][0] or "1970-01-01T00:00:00Z"
+        sig_ts_end = hits_sorted[-1][0] or sig_ts
+        signals.append(
+            {
+                "rule_id": "SYS_CREDENTIAL_DUMP",
+                "ts": sig_ts,
+                "ts_end": sig_ts_end,
+                "hostname": hostname,
+                "iocs": {
+                    "hits": len(hits_sorted),
+                    "matched_patterns": list(dict.fromkeys(r for _, _, r, _ in hits_sorted)),
+                    "sample_commands": [msg for _, msg, _, _ in hits_sorted[:5]],
+                    "window_seconds": WINDOW_SECONDS,
+                },
+            }
+        )
+
+    # --- Emit WEB_LOG4SHELL signals ---
+    for (src_ip, hostname), hits in log4shell_hits.items():
+        if len(hits) < log4shell_threshold:
+            continue
+        hits_sorted = sorted(hits, key=lambda x: x[0] or "")
+        sig_ts = hits_sorted[0][0] or "1970-01-01T00:00:00Z"
+        sig_ts_end = hits_sorted[-1][0] or sig_ts
+        first_payload = hits_sorted[0][1]
+        cb_m = _LOG4SHELL_CALLBACK_RE.search(first_payload)
+        signals.append(
+            {
+                "rule_id": "WEB_LOG4SHELL",
+                "ts": sig_ts,
+                "ts_end": sig_ts_end,
+                "source_ip": src_ip,
+                "hostname": hostname,
+                "iocs": {
+                    "hits": len(hits_sorted),
+                    "matched_fields": list(dict.fromkeys(f for _, _, f, _ in hits_sorted)),
+                    "raw_payload": first_payload,
+                    "callback_host": cb_m.group(1) if cb_m else None,
+                    "callback_port": int(cb_m.group(2)) if cb_m and cb_m.group(2) else None,
+                    "sample_uris": list(dict.fromkeys(u for _, _, _, u in hits_sorted))[:5],
+                    "window_seconds": WINDOW_SECONDS,
+                },
+            }
+        )
+
     # --- Emit KILL_CHAIN_WEBBRUTEFORCE_TO_EXPLOIT signals ---
     web_bruteforce_ips: set[str] = bf_http_ips.copy()
     if web_bruteforce_ips:
         _WEBBF_EXPLOIT_RULES: frozenset[str] = frozenset({
             "WEB_WEBSHELL", "SQL_INJECTION", "DIRECTORY_TRAVERSAL_SUCCESS",
             "NET_REVERSE_SHELL", "SSRF",
+            "WEB_LFI_RFI", "WEB_LOG4SHELL", "WEB_SENSITIVE_FILE_ACCESS",
         })
         already_correlated_bf: set[str] = set()
         for signal in list(signals):
@@ -1639,9 +2061,19 @@ def detect_signals_window_1h(
         if len(hits) < idor_threshold:
             continue
         hits_sorted = sorted(hits, key=lambda x: x[0] or "")
+        uris = [h[1] for h in hits_sorted]
+
+        # Qualifier : séquentialité OU enumeration (IDs distincts).
+        # Un utilisateur normal accède plusieurs fois au même ID (ses propres ressources) ;
+        # un attaquant IDOR teste des IDs différents (séquentiels ou en scatter).
+        distinct_ids = set(filter(None, (_extract_id(u) for u in uris)))
+        is_sequential = _is_sequential(uris)
+        is_enumeration = len(distinct_ids) >= idor_distinct_ids_threshold
+        if not is_sequential and not is_enumeration:
+            continue
+
         sig_ts = hits_sorted[0][0] or "1970-01-01T00:00:00Z"
         sig_ts_end = hits_sorted[-1][0] or sig_ts
-        uris = [h[1] for h in hits_sorted]
         signals.append(
             {
                 "rule_id": "WEB_IDOR",
@@ -1651,7 +2083,8 @@ def detect_signals_window_1h(
                 "hostname": hostname,
                 "iocs": {
                     "hits": len(hits_sorted),
-                    "sequential_ids_detected": _is_sequential(uris),
+                    "distinct_ids": len(distinct_ids),
+                    "sequential_ids_detected": is_sequential,
                     "sample_uris": uris[:10],
                     "threshold": idor_threshold,
                     "window_seconds": WINDOW_SECONDS,
@@ -1663,13 +2096,14 @@ def detect_signals_window_1h(
     web_scan_ips: set[str] = set(nikto_ua_hits.keys())
     web_scan_ips |= {
         s["source_ip"] for s in signals
-        if s["rule_id"] == "WEB_DIR_BRUTEFORCE" and s.get("source_ip")
+        if s["rule_id"] in ("WEB_DIR_BRUTEFORCE", "WEB_SCANNER_UA_DETECTED") and s.get("source_ip")
     }
     if web_scan_ips:
         _WEBSCAN_EXPLOIT_RULES: frozenset[str] = frozenset({
             "SQL_INJECTION", "WEB_SQLI_AUTOMATED",
             "DIRECTORY_TRAVERSAL", "DIRECTORY_TRAVERSAL_SUCCESS",
             "WEB_WEBSHELL", "SSRF", "NET_REVERSE_SHELL",
+            "WEB_LFI_RFI", "WEB_LOG4SHELL", "WEB_SENSITIVE_FILE_ACCESS",
         })
         already_correlated_webscan: set[str] = set()
         for signal in list(signals):
@@ -1688,12 +2122,266 @@ def detect_signals_window_1h(
                         "source_ip": ip,
                         "hostname": signal.get("hostname"),
                         "iocs": {
-                            "scan_rule": "WEB_NIKTO_SCAN or WEB_DIR_BRUTEFORCE",
+                            "scan_rule": "WEB_NIKTO_SCAN or WEB_DIR_BRUTEFORCE or WEB_SCANNER_UA_DETECTED",
                             "exploit_rule": signal["rule_id"],
                             "description": "Scan web suivi d'une exploitation dans la même fenêtre",
                             "window_seconds": WINDOW_SECONDS,
                         },
                     }
                 )
+
+    # --- Emit KILL_CHAIN_LFI_TO_WEBSHELL (LFI → webshell upload, same attacker IP) ---
+    _lfi_by_ip: dict[str, dict] = {}
+    _webshell_by_ip: dict[str, dict] = {}
+    for s in signals:
+        if s["rule_id"] == "WEB_LFI_RFI" and s.get("source_ip"):
+            _lfi_by_ip.setdefault(s["source_ip"], s)
+        elif s["rule_id"] == "WEB_WEBSHELL" and s.get("source_ip"):
+            _webshell_by_ip.setdefault(s["source_ip"], s)
+
+    _done_lfi_webshell: set[str] = set()
+    for ip, ws in _webshell_by_ip.items():
+        lfi = _lfi_by_ip.get(ip)
+        if lfi is None or ip in _done_lfi_webshell:
+            continue
+        _done_lfi_webshell.add(ip)
+        lfi_ts = lfi.get("ts", "1970-01-01T00:00:00Z")
+        ws_ts = ws.get("ts", "1970-01-01T00:00:00Z")
+        try:
+            delta_lfi_ws = int(abs((_to_dt(ws_ts) - _to_dt(lfi_ts)).total_seconds()))
+        except Exception:
+            delta_lfi_ws = None
+        sig_ts = min(lfi_ts, ws_ts)
+        sig_ts_end = max(ws.get("ts_end") or ws_ts, lfi.get("ts_end") or lfi_ts)
+        lfi_uri_samples = (lfi.get("iocs") or {}).get("uri_samples", [])[:3]
+        webshell_uri = ((ws.get("iocs") or {}).get("sample_uris") or [""])[0]
+        signals.append(
+            {
+                "rule_id": "KILL_CHAIN_LFI_TO_WEBSHELL",
+                "ts": sig_ts,
+                "ts_end": sig_ts_end,
+                "source_ip": ip,
+                "hostname": ws.get("hostname"),
+                "iocs": {
+                    "lfi_signal": "WEB_LFI_RFI",
+                    "lfi_uri_samples": lfi_uri_samples,
+                    "webshell_signal": "WEB_WEBSHELL",
+                    "webshell_uri": webshell_uri,
+                    "delta_seconds": delta_lfi_ws,
+                    "window_seconds": WINDOW_SECONDS,
+                },
+            }
+        )
+
+    # --- Emit KILL_CHAIN_LOG4SHELL_TO_SHELL (Log4Shell exploit → reverse shell callback) ---
+    # Correlation: attacker IP from WEB_LOG4SHELL == C2 destination from NET_REVERSE_SHELL.
+    # Network events have no hostname, but the callback always points back to the same attacker IP.
+    _log4shell_by_attacker: dict[str, dict] = {}
+    for s in signals:
+        if s["rule_id"] == "WEB_LOG4SHELL" and s.get("source_ip"):
+            _log4shell_by_attacker.setdefault(s["source_ip"], s)
+
+    _done_log4shell_rce: set[str] = set()
+    for s in list(signals):
+        if s["rule_id"] != "NET_REVERSE_SHELL":
+            continue
+        c2_ip = (s.get("iocs") or {}).get("destination_ip")
+        if not c2_ip or c2_ip in _done_log4shell_rce:
+            continue
+        log4 = _log4shell_by_attacker.get(c2_ip)
+        if log4 is None:
+            continue
+        _done_log4shell_rce.add(c2_ip)
+        l4_ts = log4.get("ts", "1970-01-01T00:00:00Z")
+        rs_ts = s.get("ts", "1970-01-01T00:00:00Z")
+        try:
+            delta_l4_rs = int(abs((_to_dt(rs_ts) - _to_dt(l4_ts)).total_seconds()))
+        except Exception:
+            delta_l4_rs = None
+        sig_ts = min(l4_ts, rs_ts)
+        sig_ts_end = max(s.get("ts_end") or rs_ts, log4.get("ts_end") or l4_ts)
+        l4_iocs = log4.get("iocs") or {}
+        rs_iocs = s.get("iocs") or {}
+        signals.append(
+            {
+                "rule_id": "KILL_CHAIN_LOG4SHELL_TO_SHELL",
+                "ts": sig_ts,
+                "ts_end": sig_ts_end,
+                "source_ip": c2_ip,
+                "hostname": log4.get("hostname"),
+                "iocs": {
+                    "attacker_ip": c2_ip,
+                    "victim_host": log4.get("hostname"),
+                    "log4shell_payload": l4_iocs.get("raw_payload"),
+                    "callback_host": l4_iocs.get("callback_host"),
+                    "reverse_shell_dst_ip": c2_ip,
+                    "reverse_shell_port": (rs_iocs.get("destination_ports") or [None])[0],
+                    "delta_seconds": delta_l4_rs,
+                    "window_seconds": WINDOW_SECONDS,
+                },
+            }
+        )
+
+    # --- Emit KILL_CHAIN_CRED_DUMP_TO_EXFIL (credential dump followed by exfiltration) ---
+    _cred_dump_by_host: dict[str, dict] = {}
+    _exfil_tool_by_host: dict[str, dict] = {}
+    _ssh_exfil_list: list[dict] = []
+    for s in signals:
+        if s["rule_id"] == "SYS_CREDENTIAL_DUMP" and s.get("hostname"):
+            _cred_dump_by_host.setdefault(s["hostname"], s)
+        elif s["rule_id"] == "SYS_EXFIL_TOOL" and s.get("hostname"):
+            _exfil_tool_by_host.setdefault(s["hostname"], s)
+        elif s["rule_id"] == "SSH_EXFIL":
+            _ssh_exfil_list.append(s)
+
+    _done_cred_exfil: set[str] = set()
+
+    # SYS_EXFIL_TOOL: strict hostname match
+    for host, dump in _cred_dump_by_host.items():
+        exfil = _exfil_tool_by_host.get(host)
+        if exfil is None or host in _done_cred_exfil:
+            continue
+        _done_cred_exfil.add(host)
+        dump_ts = dump.get("ts", "1970-01-01T00:00:00Z")
+        exfil_ts = exfil.get("ts", "1970-01-01T00:00:00Z")
+        try:
+            delta_cd_ex = int(abs((_to_dt(exfil_ts) - _to_dt(dump_ts)).total_seconds()))
+        except Exception:
+            delta_cd_ex = None
+        sig_ts = min(dump_ts, exfil_ts)
+        sig_ts_end = max(exfil.get("ts_end") or exfil_ts, dump.get("ts_end") or dump_ts)
+        dump_cmd = ((dump.get("iocs") or {}).get("sample_commands") or [""])[0]
+        exfil_cmd = ((exfil.get("iocs") or {}).get("sample_messages") or [""])[0]
+        signals.append(
+            {
+                "rule_id": "KILL_CHAIN_CRED_DUMP_TO_EXFIL",
+                "ts": sig_ts,
+                "ts_end": sig_ts_end,
+                "hostname": host,
+                "iocs": {
+                    "victim_host": host,
+                    "dump_signal": "SYS_CREDENTIAL_DUMP",
+                    "dump_command": dump_cmd,
+                    "exfil_signal": "SYS_EXFIL_TOOL",
+                    "exfil_command": exfil_cmd,
+                    "exfil_dst_ip": None,
+                    "delta_seconds": delta_cd_ex,
+                    "estimated_data": "credentials",
+                    "window_seconds": WINDOW_SECONDS,
+                },
+            }
+        )
+
+    # SSH_EXFIL: window-level correlation (no hostname on network events — best-effort)
+    if _ssh_exfil_list:
+        for host, dump in _cred_dump_by_host.items():
+            if host in _done_cred_exfil:
+                continue
+            _done_cred_exfil.add(host)
+            ssh_exfil = _ssh_exfil_list[0]
+            dump_ts = dump.get("ts", "1970-01-01T00:00:00Z")
+            exfil_ts = ssh_exfil.get("ts", "1970-01-01T00:00:00Z")
+            try:
+                delta_cd_ssh = int(abs((_to_dt(exfil_ts) - _to_dt(dump_ts)).total_seconds()))
+            except Exception:
+                delta_cd_ssh = None
+            sig_ts = min(dump_ts, exfil_ts)
+            sig_ts_end = max(ssh_exfil.get("ts_end") or exfil_ts, dump.get("ts_end") or dump_ts)
+            dump_cmd = ((dump.get("iocs") or {}).get("sample_commands") or [""])[0]
+            signals.append(
+                {
+                    "rule_id": "KILL_CHAIN_CRED_DUMP_TO_EXFIL",
+                    "ts": sig_ts,
+                    "ts_end": sig_ts_end,
+                    "hostname": host,
+                    "source_ip": ssh_exfil.get("source_ip"),
+                    "iocs": {
+                        "victim_host": host,
+                        "dump_signal": "SYS_CREDENTIAL_DUMP",
+                        "dump_command": dump_cmd,
+                        "exfil_signal": "SSH_EXFIL",
+                        "exfil_command": None,
+                        "exfil_dst_ip": ssh_exfil.get("source_ip"),
+                        "delta_seconds": delta_cd_ssh,
+                        "estimated_data": "credentials",
+                        "window_seconds": WINDOW_SECONDS,
+                    },
+                }
+            )
+
+    # --- Emit KILL_CHAIN_STUFFING_TO_WEBSHELL ---
+    # Condition: CREDENTIAL_STUFFING_SUCCESS + WEB_WEBSHELL + NET_REVERSE_SHELL in window.
+    # No strict IP constraint on webshell — attacker may rotate proxy after auth.
+    _stuffing_success_sigs = [s for s in signals if s["rule_id"] == "CREDENTIAL_STUFFING_SUCCESS"]
+    _webshell_sigs_all = [s for s in signals if s["rule_id"] == "WEB_WEBSHELL"]
+    _reverse_shell_sigs_all = [s for s in signals if s["rule_id"] == "NET_REVERSE_SHELL"]
+
+    if _stuffing_success_sigs and _webshell_sigs_all and _reverse_shell_sigs_all:
+        cs_sig = _stuffing_success_sigs[0]
+        ws_sig = _webshell_sigs_all[0]
+        rs_sig = _reverse_shell_sigs_all[0]
+
+        cs_ts = cs_sig.get("ts", "1970-01-01T00:00:00Z")
+        rs_ts = rs_sig.get("ts", "1970-01-01T00:00:00Z")
+        try:
+            delta_stuf_shell = int(abs((_to_dt(rs_ts) - _to_dt(cs_ts)).total_seconds()))
+        except Exception:
+            delta_stuf_shell = None
+
+        all_ts = [
+            t for t in [
+                cs_ts,
+                ws_sig.get("ts"),
+                rs_ts,
+                cs_sig.get("ts_end"),
+                ws_sig.get("ts_end"),
+                rs_sig.get("ts_end"),
+            ]
+            if t and not t.startswith("1970")
+        ]
+        sig_ts = min(all_ts) if all_ts else cs_ts
+        sig_ts_end = max(all_ts) if all_ts else rs_ts
+
+        cs_iocs = cs_sig.get("iocs") or {}
+        ws_iocs = ws_sig.get("iocs") or {}
+        rs_iocs = rs_sig.get("iocs") or {}
+
+        compromised_account = (cs_iocs.get("compromised_usernames") or [None])[0]
+        webshell_uri = (ws_iocs.get("sample_uris") or [""])[0]
+        rs_host = rs_sig.get("source_ip")
+        rs_dst_ip = rs_iocs.get("destination_ip")
+        rs_port = (rs_iocs.get("destination_ports") or [None])[0]
+
+        # collect all contributing rule_ids in this window for context
+        prior = sorted({
+            s["rule_id"] for s in signals
+            if s["rule_id"] in {
+                "CREDENTIAL_STUFFING",
+                "CREDENTIAL_STUFFING_SUCCESS",
+                "WEB_WEBSHELL",
+                "NET_REVERSE_SHELL",
+            }
+        })
+
+        signals.append(
+            {
+                "rule_id": "KILL_CHAIN_STUFFING_TO_WEBSHELL",
+                "ts": sig_ts,
+                "ts_end": sig_ts_end,
+                "source_ip": cs_sig.get("source_ip"),
+                "iocs": {
+                    "stuffing_ip": cs_sig.get("source_ip"),
+                    "compromised_account": compromised_account,
+                    "webshell_uri": webshell_uri,
+                    "webshell_ip": ws_sig.get("source_ip"),
+                    "reverse_shell_host": rs_host,
+                    "reverse_shell_dst_ip": rs_dst_ip,
+                    "reverse_shell_port": rs_port,
+                    "delta_stuffing_to_shell_seconds": delta_stuf_shell,
+                    "prior_signals": prior,
+                    "window_seconds": WINDOW_SECONDS,
+                },
+            }
+        )
 
     return signals
