@@ -16,5 +16,8 @@ RUN pip install --no-cache-dir -r /tmp/requirements-api.txt
 
 COPY src /app/src
 
+# Catalogue d’alertes (``GET /api/v1/alerts``) — même chemin que le défaut ``database/alerts.json`` à la racine du dépôt.
+COPY database /app/database
+
 EXPOSE 8020
 CMD ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8020"]
