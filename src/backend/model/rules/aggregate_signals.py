@@ -5,13 +5,13 @@ from datetime import datetime, timezone
 from typing import Any, Iterable, TypedDict
 
 
-class Incident(TypedDict, total=False):
+class Incident(TypedDict):
     rule_id: str
     source_ip: str
     username: str
     hostname: str
-    start_time: str
-    end_time: str
+    start_time: str  # ISO 8601 UTC, never empty
+    end_time: str    # ISO 8601 UTC, never empty
     indicators: dict[str, Any]
     evidence_ids: list[str]
 
@@ -44,9 +44,16 @@ def aggregate_signals(signals: Iterable[dict[str, Any]], *, max_evidence_ids: in
         key = (rule, ip, user, host)
 
         ts = s.get("ts") or ""
-        dt = None
+        dt_start = None
         if ts and not ts.startswith("1970-01-01"):
-            dt = _to_dt(ts)
+            dt_start = _to_dt(ts)
+
+        ts_end = s.get("ts_end") or ""
+        dt_end = None
+        if ts_end and not ts_end.startswith("1970-01-01"):
+            dt_end = _to_dt(ts_end)
+        if dt_end is None:
+            dt_end = dt_start
 
         b = buckets.get(key)
         if b is None:
@@ -55,18 +62,19 @@ def aggregate_signals(signals: Iterable[dict[str, Any]], *, max_evidence_ids: in
                 "source_ip": ip or None,
                 "username": user or None,
                 "hostname": host or None,
-                "start_dt": dt,
-                "end_dt": dt,
+                "start_dt": dt_start,
+                "end_dt": dt_end,
                 "evidence_ids": [],
                 "indicators": {},
             }
 
         # timeline
-        if dt is not None:
-            if b["start_dt"] is None or dt < b["start_dt"]:
-                b["start_dt"] = dt
-            if b["end_dt"] is None or dt > b["end_dt"]:
-                b["end_dt"] = dt
+        if dt_start is not None:
+            if b["start_dt"] is None or dt_start < b["start_dt"]:
+                b["start_dt"] = dt_start
+        if dt_end is not None:
+            if b["end_dt"] is None or dt_end > b["end_dt"]:
+                b["end_dt"] = dt_end
 
         # evidence
         for eid in s.get("evidence_ids") or []:
@@ -89,6 +97,9 @@ def aggregate_signals(signals: Iterable[dict[str, Any]], *, max_evidence_ids: in
 
     out: list[Incident] = []
     for key, b in buckets.items():
+        if b["start_dt"] is None or b["end_dt"] is None:
+            continue
+
         indicators = dict(b["indicators"])
         if counters.get(key):
             indicators["top_kv"] = dict(counters[key].most_common(10))
@@ -99,8 +110,8 @@ def aggregate_signals(signals: Iterable[dict[str, Any]], *, max_evidence_ids: in
                 "source_ip": b.get("source_ip") or "",
                 "username": b.get("username") or "",
                 "hostname": b.get("hostname") or "",
-                "start_time": _to_z(b["start_dt"]) if b["start_dt"] else "",
-                "end_time": _to_z(b["end_dt"]) if b["end_dt"] else "",
+                "start_time": _to_z(b["start_dt"]),
+                "end_time": _to_z(b["end_dt"]),
                 "indicators": indicators,
                 "evidence_ids": b["evidence_ids"],
             }
