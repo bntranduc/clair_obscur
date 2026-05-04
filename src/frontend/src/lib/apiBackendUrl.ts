@@ -11,7 +11,10 @@ function apiBaseFromEnv(): string {
   return raw.replace(/\/+$/, "");
 }
 
-const API_BASE_DEV = "http://127.0.0.1:8020";
+
+// const API_BASE_DEV = "http://127.0.0.1:8020";
+const API_BASE_DEV = "https://api.clairobscur.tech";
+
 
 export function getBackendBaseUrl(): string {
   const fromEnv = apiBaseFromEnv();
