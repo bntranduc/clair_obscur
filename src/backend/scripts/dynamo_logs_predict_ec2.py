@@ -82,7 +82,7 @@ def _fetch_last_events(*, pk: str, total: int, region: str | None, table: str | 
 def main() -> int:
     base = MODEL_API_BASE.rstrip("/")
     timeout = int(os.environ.get("PREDICT_TIMEOUT_SEC", "600"))
-    limit = int(os.environ.get("PREDICT_LIMIT", "2000"))
+    limit = 100_000
     if limit < 1:
         print("PREDICT_LIMIT doit être >= 1", file=sys.stderr)
         return 2
