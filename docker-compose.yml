@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: src/api/Dockerfile
+    ports:
+      - "8020:8020"
+    env_file: .env
+    environment:
+      LOCAL_LOGS_DIR: /data/ingestion
+    volumes:
+      - ./datasets/finale/ingestion:/data/ingestion:ro
+      - ./database:/app/database
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: src/frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: http://localhost:8020
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped

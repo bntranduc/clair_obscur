@@ -46,7 +46,14 @@ def iter_normalized_events(
     """Parcourt le préfixe S3 et produit un flux d’événements normalisés (un par ligne JSON valide).
 
     Ordre par défaut : objets S3 du plus récent au plus ancien, puis lignes dans chaque fichier.
+    Si LOCAL_LOGS_DIR est défini, lit depuis le répertoire local au lieu de S3.
     """
+    _local = (os.getenv("LOCAL_LOGS_DIR") or "").strip()
+    if _local:
+        from backend.log.local_logs import iter_normalized_events as _local_iter
+        yield from _local_iter(_local, newest_first=newest_first)
+        return
+
     s3, b, pfx = _s3_client(
         bucket=bucket,
         prefix=prefix,
@@ -114,7 +121,15 @@ def fetch_normalized_page(
     profile_name: str | None = None,
     credentials: dict[str, str] | None = None,
 ) -> tuple[list[NormalizedEvent], bool]:
-    """Retourne une fenêtre paginée ``(items, has_more)`` sans charger tout le bucket."""
+    """Retourne une fenêtre paginée ``(items, has_more)`` sans charger tout le bucket.
+
+    Si LOCAL_LOGS_DIR est défini, lit depuis le répertoire local au lieu de S3.
+    """
+    _local = (os.getenv("LOCAL_LOGS_DIR") or "").strip()
+    if _local:
+        from backend.log.local_logs import fetch_normalized_page as _local_fetch
+        return _local_fetch(skip=skip, limit=limit, local_dir=_local)
+
     if skip < 0:
         skip = 0
     if limit < 1:
