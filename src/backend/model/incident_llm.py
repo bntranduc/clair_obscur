@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Literal, Mapping, Sequence
 
+from backend.model.api_client import API_MODEL_ID_DEFAULT, anthropic_converse_text
 from backend.model.bedrock_client import MODEL_ID_DEFAULT, bedrock_converse_text
 from backend.model.prompt.prompt import PREDICTION_PROMPT_TEMPLATE
 
@@ -133,13 +134,18 @@ def build_prediction_prompt(
 def predict_submission_from_incidents(
     aggregated_incidents: Sequence[Mapping[str, Any]],
     *,
+    backend: Literal["bedrock", "api"] = "bedrock",
     allowed_attack_types: Sequence[str] | None = None,
     detection_time_seconds: int = DEFAULT_DETECTION_TIME_SECONDS,
+    # bedrock params
     region: str = "eu-west-3",
     model_id: str = MODEL_ID_DEFAULT,
     max_tokens: int = 4096,
     profile_name: str | None = None,
     inline_aws_credentials: Mapping[str, str] | None = None,
+    # direct api params
+    api_key: str | None = None,
+    api_model_id: str = API_MODEL_ID_DEFAULT,
 ) -> Any:
     allowed = tuple(allowed_attack_types or DEFAULT_ALLOWED_ATTACK_TYPES)
     prompt = build_prediction_prompt(
@@ -147,12 +153,20 @@ def predict_submission_from_incidents(
         allowed_attack_types=allowed,
         detection_time_seconds=detection_time_seconds,
     )
-    raw = bedrock_converse_text(
-        prompt,
-        region=region,
-        model_id=model_id,
-        max_tokens=max_tokens,
-        profile_name=profile_name,
-        inline_credentials=dict(inline_aws_credentials) if inline_aws_credentials else None,
-    )
+    if backend == "api":
+        raw = anthropic_converse_text(
+            prompt,
+            model_id=api_model_id,
+            max_tokens=max_tokens,
+            api_key=api_key,
+        )
+    else:
+        raw = bedrock_converse_text(
+            prompt,
+            region=region,
+            model_id=model_id,
+            max_tokens=max_tokens,
+            profile_name=profile_name,
+            inline_credentials=dict(inline_aws_credentials) if inline_aws_credentials else None,
+        )
     return _extract_json_value(raw)

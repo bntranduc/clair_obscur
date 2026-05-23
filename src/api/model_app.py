@@ -84,6 +84,10 @@ class InlineAwsCredentials(BaseModel):
 
 class PredictRequest(BaseModel):
     events: list[dict[str, Any]] = Field(..., min_length=1)
+    backend: str | None = Field(
+        default=None,
+        description="'api' pour l'Anthropic API directe, 'bedrock' (défaut) ou variable d'env MODEL_BACKEND.",
+    )
     aws_credentials: InlineAwsCredentials | None = Field(
         default=None,
         description="Optionnel : Bedrock avec ces identifiants pour cette requête ; sinon identifiants ambiant (profil / rôle).",
