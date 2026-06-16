@@ -13,6 +13,16 @@ services:
       - ./database:/app/database
     restart: unless-stopped
 
+  llm:
+    build:
+      context: ./src/llm
+      dockerfile: Dockerfile
+    ports:
+      - "8030:8030"
+    volumes:
+      - ${LLM_CHECKPOINTS_DIR:-../llm/checkpoints}:/app/checkpoints:ro
+    restart: unless-stopped
+
   frontend:
     build:
       context: src/frontend
