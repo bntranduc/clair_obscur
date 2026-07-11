@@ -24,8 +24,14 @@ for uri in "${payloads[@]}"; do
     -H "User-Agent: sqlmap/1.8#stable (fake-attack)" \
     -H "X-Forwarded-For: ${ATTACKER_IP}" \
     "${BASE}${uri}" || true
-  sleep 0.3
+  sleep 0.2
 done
+
+# SSRF : 3e requête pour franchir le seuil par défaut (ssrf_min_hits=3)
+curl -sf -o /dev/null -w "  %{http_code} /fetch?url=http://127.0.0.1:9200/\n" \
+  -H "User-Agent: sqlmap/1.8#stable (fake-attack)" \
+  -H "X-Forwarded-For: ${ATTACKER_IP}" \
+  "${BASE}/fetch?url=http://127.0.0.1:9200/" || true
 
 echo "==> Rafale HTTP (brute force simulé)"
 for i in $(seq 1 15); do
