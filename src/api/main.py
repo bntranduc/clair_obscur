@@ -23,9 +23,14 @@ from backend.aws.s3.logs import fetch_normalized_page  # noqa: E402
 from backend.analytics.dynamodb_dashboard import (  # noqa: E402
     DYNAMODB_ANALYTICS_MAX_ITEMS_CAP,
     get_dynamodb_dashboard,
+    get_local_logs_dashboard,
+)
+from backend.log.local_logs import (  # noqa: E402
+    fetch_normalized_page_cursor,
+    resolve_local_logs_dir,
 )
 from backend.analytics.siem import get_siem_dashboard  # noqa: E402
-from backend.alerts.store import load_all_alerts  # noqa: E402
+from backend.alerts.store import load_all_alerts, alerts_json_path  # noqa: E402
 from backend.clustering import compute_alert_cluster_graph  # noqa: E402
 from api.agent_catalog import build_agent_catalog  # noqa: E402
 from api.agentic_bridge import _repo_root  # noqa: E402
@@ -78,6 +83,16 @@ def agents_catalog_alias() -> dict[str, Any]:
 @app.get("/")
 def root() -> dict[str, str]:
     return {"service": "clair-obscur-api"}
+
+
+@app.get("/health")
+def health() -> dict[str, Any]:
+    local = resolve_local_logs_dir()
+    return {
+        "ok": True,
+        "alerts_path": str(alerts_json_path()),
+        "local_logs_dir": str(local) if local else None,
+    }
 
 
 @app.get(f"{API_V1}/alerts", tags=["alerts"])
@@ -201,7 +216,26 @@ def normalized_logs_dynamodb(
     ),
     region: str | None = Query(None, description="Région AWS (DynamoDB) ; défaut env / eu-west-3."),
 ) -> dict[str, Any]:
-    """Logs normalisés depuis DynamoDB. Identifiants AWS : **uniquement** rôle IAM / ``.env`` du serveur (pas de clés en query)."""
+    """Logs normalisés. Si ``LOCAL_LOGS_DIR`` est défini, lit les JSONL locaux ; sinon DynamoDB."""
+    local_dir = resolve_local_logs_dir()
+    if local_dir is not None:
+        try:
+            items, has_more, next_cursor = fetch_normalized_page_cursor(
+                limit=limit,
+                start_key=(start_key or "").strip() or None,
+                local_dir=local_dir,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        return {
+            "items": items,
+            "has_more": has_more,
+            "next_start_key": next_cursor,
+            "limit": limit,
+            "pk": f"local:{local_dir}",
+            "data_source": "local",
+        }
+
     pk_resolved = (
         (pk or "").strip()
         or os.getenv("DYNAMODB_LOGS_PK", "").strip()
@@ -257,14 +291,24 @@ def analytics_dynamodb(
         description="Agrégation de la chronologie : ``hour`` (par heure UTC) ou ``minute`` (par minute UTC).",
     ),
 ) -> dict[str, Any]:
-    """Métriques et séries : lecture des ``max_items`` derniers éléments de la partition, puis filtre période optionnel."""
+    """Métriques et séries : DynamoDB ou ``LOCAL_LOGS_DIR`` si défini."""
+    local_dir = resolve_local_logs_dir()
+    s, u = _analytics_time_bounds(since, until)
+    if local_dir is not None:
+        return get_local_logs_dashboard(
+            local_dir,
+            max_items=max_items,
+            since=s,
+            until=u,
+            timeline_granularity=timeline_granularity,
+        )
+
     pk_resolved = (
         (pk or "").strip()
         or os.getenv("DYNAMODB_LOGS_PK", "").strip()
         or os.getenv("DYNAMODB_PK", "").strip()
         or default_logs_partition_key()
     )
-    s, u = _analytics_time_bounds(since, until)
     try:
         return get_dynamodb_dashboard(
             pk=pk_resolved,

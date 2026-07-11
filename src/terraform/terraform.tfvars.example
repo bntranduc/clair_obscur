@@ -1,0 +1,29 @@
+# Copier : cp terraform.tfvars.example terraform.tfvars
+#
+# 1. IAM : clair-obscur-admin + AdministratorAccess + access key
+# 2. aws configure --profile clair-obscur
+# 3. ./scripts/deploy-infra.sh
+
+aws_region   = "eu-west-3"
+aws_profile  = "clair-obscur"
+project_name = "clair-obscur"
+environment  = "dev"
+
+force_destroy = true
+
+raw_logs_prefix    = "raw/opensearch/logs-raw"
+predictions_prefix = "predictions"
+enable_versioning  = true
+
+# dynamodb_table_name = ""   # auto : clair-obscur-<account_id>-normalized-logs
+dynamodb_demo_day = "2026-01-12"
+
+# sqs_queue_name = ""        # auto : clair-obscur-<account_id>-predict
+sqs_visibility_timeout_seconds = 900
+
+# EC2 worker SQS (enable_ec2_worker = true par défaut)
+# worker_git_repo_url = "https://github.com/bntranduc/clair_obscur.git"
+# worker_git_ref        = "main"
+# worker_instance_type    = "t3.micro"
+# worker_bedrock_model_id = "eu.anthropic.claude-sonnet-4-6"
+# worker_key_name         = ""   # SSH optionnel ; sinon SSM Session Manager

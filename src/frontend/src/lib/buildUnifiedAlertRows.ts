@@ -1,4 +1,4 @@
-import type { ModelAlert, SeverityLevel } from "@/types/modelPrediction";
+import type { AlertCatalogItem, SeverityLevel } from "@/types/alertsCatalog";
 import { formatMaybeIsoDate } from "@/lib/alertDetailFormat";
 import { fieldLabelFr } from "@/lib/modelFieldLabels";
 
@@ -47,12 +47,12 @@ function formatIndicatorsObject(ind: Record<string, unknown>): string {
 }
 
 /** Aplatit alerte en lignes fusionnées détection + confiance + justification. */
-export function buildUnifiedAlertRows(alert: ModelAlert): UnifiedRow[] {
-  const conf = alert.confidence as Record<string, unknown>;
-  const reasons = alert.reasons as Record<string, unknown>;
+export function buildUnifiedAlertRows(alert: AlertCatalogItem): UnifiedRow[] {
+  const conf = (alert.confidence ?? {}) as Record<string, unknown>;
+  const reasons = (alert.reasons ?? {}) as Record<string, unknown>;
   const confDet = (conf.detection as Record<string, unknown>) ?? {};
   const reasDet = (reasons.detection as Record<string, unknown>) ?? {};
-  const det = alert.detection;
+  const det = alert.detection ?? {};
 
   const rows: UnifiedRow[] = [];
 
@@ -67,7 +67,7 @@ export function buildUnifiedAlertRows(alert: ModelAlert): UnifiedRow[] {
   rows.push({
     id: "severity",
     label: fieldLabelFr("severity"),
-    value: SEVERITY_FR[alert.severity] ?? alert.severity,
+    value: SEVERITY_FR[alert.severity as SeverityLevel] ?? alert.severity,
     score: asNum(conf.severity),
     reason: asStr(reasons.severity),
   });
@@ -91,7 +91,7 @@ export function buildUnifiedAlertRows(alert: ModelAlert): UnifiedRow[] {
   rows.push({
     id: "detection_time_seconds",
     label: fieldLabelFr("detection_time_seconds"),
-    value: `${alert.detection_time_seconds} s`,
+    value: `${alert.detection_time_seconds ?? "—"} s`,
     score: asNum(conf.detection_time_seconds),
     reason: asStr(reasons.detection_time_seconds),
   });
@@ -99,7 +99,7 @@ export function buildUnifiedAlertRows(alert: ModelAlert): UnifiedRow[] {
   rows.push({
     id: "attack_type",
     label: fieldLabelFr("attack_type"),
-    value: det.attack_type,
+    value: det.attack_type ?? "—",
     score: asNum(confDet.attack_type),
     reason: asStr(reasDet.attack_type),
   });
@@ -141,7 +141,7 @@ export function buildUnifiedAlertRows(alert: ModelAlert): UnifiedRow[] {
   rows.push({
     id: "attack_start_time",
     label: fieldLabelFr("attack_start_time"),
-    value: formatMaybeIsoDate(det.attack_start_time).primary,
+    value: formatMaybeIsoDate(det.attack_start_time ?? "").primary,
     score: asNum(confDet.attack_start_time),
     reason: asStr(reasDet.attack_start_time),
   });
@@ -149,7 +149,7 @@ export function buildUnifiedAlertRows(alert: ModelAlert): UnifiedRow[] {
   rows.push({
     id: "attack_end_time",
     label: fieldLabelFr("attack_end_time"),
-    value: formatMaybeIsoDate(det.attack_end_time).primary,
+    value: formatMaybeIsoDate(det.attack_end_time ?? "").primary,
     score: asNum(confDet.attack_end_time),
     reason: asStr(reasDet.attack_end_time),
   });

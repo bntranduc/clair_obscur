@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import type { ModelAlert } from "@/types/modelPrediction";
+import type { AlertCatalogItem } from "@/types/alertsCatalog";
 import { attackDisplayName } from "@/lib/attackLabels";
 import { formatShortDateTime } from "@/lib/alertDetailFormat";
 import SeverityBadge from "@/components/dashboard/SeverityBadge";
@@ -14,12 +14,12 @@ export default function AlertTicketCard({
   alert,
   layout = "grid",
 }: {
-  alert: ModelAlert;
+  alert: AlertCatalogItem;
   layout?: AlertsLayoutMode;
 }) {
   const title = attackDisplayName(alert.detection?.attack_type ?? alert.challenge_id);
   const href = `/dashboard/alertes/${encodeURIComponent(alert.challenge_id)}`;
-  const startLabel = formatShortDateTime(alert.detection.attack_start_time);
+  const startLabel = formatShortDateTime(alert.detection?.attack_start_time ?? "");
   const surface = alertCardSurfaceClass(alert.severity);
 
   if (layout === "row") {
@@ -29,7 +29,7 @@ export default function AlertTicketCard({
       >
         <div className="flex shrink-0 items-baseline gap-1.5 font-mono text-[11px] tabular-nums text-zinc-500 sm:w-[11rem]">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-600">Début</span>
-          <time dateTime={alert.detection.attack_start_time} className="text-zinc-400">
+          <time dateTime={alert.detection?.attack_start_time} className="text-zinc-400">
             {startLabel}
           </time>
         </div>
@@ -78,7 +78,7 @@ export default function AlertTicketCard({
             <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-zinc-500">
               <span className="shrink-0 font-semibold uppercase tracking-wide text-zinc-600">Début</span>
               <time
-                dateTime={alert.detection.attack_start_time}
+                dateTime={alert.detection?.attack_start_time}
                 className="font-mono tabular-nums text-zinc-400"
               >
                 {startLabel}

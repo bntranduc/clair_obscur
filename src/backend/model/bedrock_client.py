@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from backend.aws.aws_client import AwsClient
 
-MODEL_ID_DEFAULT = "eu.anthropic.claude-opus-4-6-v1"
+MODEL_ID_DEFAULT = "eu.anthropic.claude-sonnet-4-6"
 
 
 def _aws_client_for_bedrock(

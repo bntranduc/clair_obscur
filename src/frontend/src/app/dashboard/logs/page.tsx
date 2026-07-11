@@ -77,8 +77,7 @@ export default function NormalizedLogsPage() {
               (paramètre <code className="font-mono text-[11px]">pk</code>, variables{" "}
               <code className="font-mono text-[11px]">DYNAMODB_PK</code> /{" "}
               <code className="font-mono text-[11px]">DYNAMODB_LOGS_PK</code> côté API, ou{" "}
-              <code className="font-mono text-[11px]">NEXT_PUBLIC_DYNAMODB_PK</code> côté front — comme{" "}
-              <code className="font-mono text-[11px]">test.py</code>).
+              <code className="font-mono text-[11px]">NEXT_PUBLIC_DYNAMODB_PK</code> côté front).
             </p>
           )}
         </div>

@@ -140,6 +140,6 @@ Chaque élément de `alerts` inclut `challenge_id`, **`severity`** (`low` \| `me
 | `run_model_api.sh` | Lance `uvicorn backend.model.model_api:app` en local (`HOST`, `PORT`) |
 | `predict.py` | `predict_alerts` → Bedrock (`inline_aws_credentials` ou profil / rôle ; voir `incident_llm`) |
 | `../scripts/run_model_serve.sh` | Lance `api.model_app:app` avec `PYTHONPATH` correct |
-| `../scripts/sqs_predict_worker.py` | Worker SQS → S3 logs → prédictions → S3 JSON |
+| `../worker/` | Worker SQS → S3 logs → prédictions → S3 JSON (Docker) |
 
 Le modèle `.env` versionné est à la racine du repo : `.env.example`.

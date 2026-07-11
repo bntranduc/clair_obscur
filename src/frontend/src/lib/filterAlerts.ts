@@ -1,4 +1,4 @@
-import type { ModelAlert, SeverityLevel } from "@/types/modelPrediction";
+import type { AlertCatalogItem, SeverityLevel } from "@/types/alertsCatalog";
 
 export type AlertsFilterState = {
   /** Valeur de `detection.attack_type` ; chaîne vide = tous */
@@ -34,16 +34,20 @@ function endOfDayLocal(ymd: string): number | null {
 }
 
 /** Fenêtre d’attaque [start, end] doit intersecter [dateFrom 00:00, dateTo 23:59] local (bornes optionnelles). */
-export function filterAlerts(alerts: ModelAlert[], f: AlertsFilterState): ModelAlert[] {
+export function filterAlerts(alerts: AlertCatalogItem[], f: AlertsFilterState): AlertCatalogItem[] {
   const fromMs = f.dateFrom ? startOfDayLocal(f.dateFrom) : null;
   const toMs = f.dateTo ? endOfDayLocal(f.dateTo) : null;
 
   return alerts.filter((a) => {
-    if (f.attackType && a.detection.attack_type !== f.attackType) return false;
+    if (f.attackType && a.detection?.attack_type !== f.attackType) return false;
     if (f.severity && a.severity !== f.severity) return false;
 
-    const as = new Date(a.detection.attack_start_time).getTime();
-    const ae = new Date(a.detection.attack_end_time).getTime();
+    const start = a.detection?.attack_start_time;
+    const end = a.detection?.attack_end_time;
+    if (!start || !end) return true;
+
+    const as = new Date(start).getTime();
+    const ae = new Date(end).getTime();
 
     if (fromMs != null && ae < fromMs) return false;
     if (toMs != null && as > toMs) return false;
@@ -51,8 +55,8 @@ export function filterAlerts(alerts: ModelAlert[], f: AlertsFilterState): ModelA
   });
 }
 
-export function uniqueAttackTypes(alerts: ModelAlert[]): string[] {
-  return [...new Set(alerts.map((a) => a.detection.attack_type))].sort((x, y) =>
+export function uniqueAttackTypes(alerts: AlertCatalogItem[]): string[] {
+  return [...new Set(alerts.map((a) => a.detection?.attack_type).filter(Boolean) as string[])].sort((x, y) =>
     x.localeCompare(y, "fr"),
   );
 }

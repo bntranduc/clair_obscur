@@ -1,6 +1,8 @@
 # --- Secrets & credentials (ne jamais committer) ---
 keys/
 secrets/
+aws_admin.txt
+**/aws_admin.txt
 *.pem
 *.ppk
 *.key
@@ -11,9 +13,24 @@ secrets/
 .envrc
 .direnv/
 .aws/
+**/.aws/
 **/.env.aws
 
-# Compose / overrides locaux avec secrets
+# Clés AWS / IAM (fichiers locaux)
+credentials
+credentials.*
+*credentials*.json
+!**/credentials.example.json
+secrets.json
+**/secrets.json
+*.secret
+*.secrets
+*_access_key*
+*_secret_key*
+amazon_admin.txt
+**/amazon_admin.txt
+
+# Terraform : état + variables locales (souvent account_id, profils)
 docker-compose.override.yml
 **/docker-compose.override.yml
 
@@ -23,7 +40,13 @@ cdk.out/
 .terraform/
 *.tfstate
 *.tfstate.*
-__MACOSX/
+*.tfvars
+!*.tfvars.example
+**/terraform.tfvars
+!**/terraform.tfvars.example
+*.auto.tfvars
+
+# Compose / overrides locaux avec secrets
 # Zip de handler Lambda généré localement (ex. ``cd src/backend/lambda/raw_logs_to_predict && zip …``)
 src/backend/lambda/**/*.zip
 
@@ -98,7 +121,7 @@ blob-report/
 .cursor/*
 !.cursor/rules/
 !.cursor/rules/**
-*.swp
+__MACOSX/
 *~
 .DS_Store
 Thumbs.db
@@ -111,9 +134,12 @@ tmp/
 *.sqlite
 *.sqlite3
 
-datasets/**
-!datasets/fake_data/
-!datasets/fake_data/**
+datasets/
 
 archives/
 results/
+model_analysis/
+*.odt
+*.pdf
+*.zip
+.~lock.*

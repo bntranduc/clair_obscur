@@ -10,7 +10,6 @@ import {
   Settings,
   Search,
   Bot,
-  BookOpen,
   ChevronsLeft,
   ChevronsRight,
   MessageCircle,
@@ -137,9 +136,8 @@ export default function DashboardLayout({
             <NavLink href="/dashboard/logs" icon={<Search size={18} strokeWidth={2} />} label="Logs" />
           </NavSection>
 
-          <NavSection title="IA & docs">
+          <NavSection title="IA">
             <NavLink href="/dashboard/chat" icon={<Bot size={18} strokeWidth={2} />} label="Assistant IA" />
-            <NavLink href="/dashboard/wiki" icon={<BookOpen size={18} strokeWidth={2} />} label="Wiki" />
           </NavSection>
 
           <NavSection title="Système">

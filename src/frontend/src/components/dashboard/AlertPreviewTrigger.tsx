@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useId, useState } from "react";
 import { PanelTop, X } from "lucide-react";
-import type { ModelAlert } from "@/types/modelPrediction";
+import type { AlertCatalogItem, SeverityLevel } from "@/types/alertsCatalog";
 import { attackDisplayName } from "@/lib/attackLabels";
 import { buildUnifiedAlertRows } from "@/lib/buildUnifiedAlertRows";
 import { SEVERITY_VISUAL } from "@/lib/severityVisual";
@@ -11,10 +11,13 @@ import UnifiedAlertSheet from "@/components/dashboard/UnifiedAlertSheet";
 import AlertHeaderBand from "@/components/dashboard/alert-article/AlertHeaderBand";
 import AlertTimelineRow from "@/components/dashboard/alert-article/AlertTimelineRow";
 
-export default function AlertPreviewTrigger({ alert }: { alert: ModelAlert }) {
+export default function AlertPreviewTrigger({ alert }: { alert: AlertCatalogItem }) {
   const [open, setOpen] = useState(false);
   const titleId = useId();
-  const sv = SEVERITY_VISUAL[alert.severity];
+  const severity = (["low", "medium", "high", "critical"] as const).includes(alert.severity as SeverityLevel)
+    ? (alert.severity as SeverityLevel)
+    : "medium";
+  const sv = SEVERITY_VISUAL[severity];
   const title = attackDisplayName(alert.detection?.attack_type ?? alert.challenge_id);
   const rows = buildUnifiedAlertRows(alert);
 
@@ -89,10 +92,16 @@ export default function AlertPreviewTrigger({ alert }: { alert: ModelAlert }) {
                 accentTextClass={sv.heroAccent}
                 compact
               />
-              <AlertTimelineRow startIso={alert.detection.attack_start_time} endIso={alert.detection.attack_end_time} compact />
+              <AlertTimelineRow
+                startIso={alert.detection?.attack_start_time ?? ""}
+                endIso={alert.detection?.attack_end_time ?? ""}
+                compact
+              />
               <div className="border-b border-white/[0.06] px-4 py-3">
                 <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">Analyse détaillée</p>
-                <p className="mt-1.5 line-clamp-6 text-[12px] leading-relaxed text-zinc-400">{alert.exhaustive_analysis}</p>
+                <p className="mt-1.5 line-clamp-6 text-[12px] leading-relaxed text-zinc-400">
+                  {alert.exhaustive_analysis ?? "—"}
+                </p>
                 {alert.remediation_proposal ? (
                   <div className="mt-3 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.07] px-3 py-2.5">
                     <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-400/90">Remédiation</p>

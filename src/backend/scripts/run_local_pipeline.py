@@ -180,7 +180,6 @@ def run(
     log_file: Path,
     *,
     limit: int | None,
-    skip_llm: bool,
     backend: str,
     model_id: str,
     region: str,
@@ -230,15 +229,7 @@ def run(
             emit("\n--- Incidents agrégés ---")
             emit(_dump(incidents))
 
-        if skip_llm:
-            emit("\n[4/4] (LLM ignoré — mode --no-llm)")
-            return
-
-        if not incidents:
-            emit("\n[4/4] Aucun incident → pas d'appel LLM.")
-            return
-
-        # 4. Prédiction LLM (retry sur ThrottlingException)
+        # 4. Prédiction LLM obligatoire (retry sur ThrottlingException)
         llm_label = f"api/{api_model_id}" if backend == "api" else f"bedrock/{model_id} region={region}"
         emit(f"\n[4/4] Envoi au LLM ({llm_label}) ...")
         t4 = time.perf_counter()
@@ -320,11 +311,6 @@ def _parse_args() -> argparse.Namespace:
         help="Nombre max d'événements à charger (défaut : tous)",
     )
     p.add_argument(
-        "--no-llm",
-        action="store_true",
-        help="Arrêter après l'agrégation (pas d'appel LLM)",
-    )
-    p.add_argument(
         "--backend",
         default=os.getenv("MODEL_BACKEND", "bedrock"),
         choices=["bedrock", "api"],
@@ -378,7 +364,6 @@ if __name__ == "__main__":
     run(
         args.log_file,
         limit=args.limit,
-        skip_llm=args.no_llm,
         backend=args.backend,
         model_id=args.model_id,
         region=args.region,

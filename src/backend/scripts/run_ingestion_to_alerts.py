@@ -4,7 +4,7 @@ Pipeline ingestion → alertes : lit tous les fichiers JSONL d'un répertoire,
 détecte les signaux, agrège, appelle le LLM et écrit database/alerts.json.
 
 Usage :
-  python run_ingestion_to_alerts.py [--ingestion-dir DIR] [--output FILE] [--no-llm]
+  python run_ingestion_to_alerts.py [--ingestion-dir DIR] [--output FILE]
 
 Variables d'environnement :
   LOCAL_LOGS_DIR        Répertoire d'ingestion (priorité sur --ingestion-dir)
@@ -101,37 +101,6 @@ def _to_alert_record(pred: dict[str, Any], numeric_id: int) -> dict[str, Any]:
     return record
 
 
-def _simplified_alerts_from_incidents(incidents: list[Any]) -> list[dict[str, Any]]:
-    """Fallback sans LLM : une alerte par incident, format minimal."""
-    alerts = []
-    seen: set[str] = set()
-    for i, inc in enumerate(incidents, 1):
-        rule_id = inc.get("rule_id", "UNKNOWN")
-        ip = inc.get("source_ip", "")
-        key = f"{rule_id}:{ip}"
-        if key in seen:
-            continue
-        seen.add(key)
-        attack_type = rule_id.lower()
-        alerts.append({
-            "id": f"rule-{rule_id}-{i}",
-            "numeric_id": i,
-            "challenge_id": attack_type,
-            "severity": "medium",
-            "alert_summary": f"{rule_id} détecté depuis {ip or 'IP inconnue'}",
-            "detection": {
-                "attack_type": attack_type,
-                "attacker_ips": [ip] if ip else [],
-                "victim_accounts": [inc.get("username")] if inc.get("username") else [],
-                "attack_start_time": inc.get("start_time", ""),
-                "attack_end_time": inc.get("end_time", ""),
-                "indicators": inc.get("indicators", {}),
-            },
-            "detection_time_seconds": DEFAULT_DETECTION_TIME_SECONDS,
-        })
-    return alerts
-
-
 def _call_llm(incidents: list[Any], *, backend: str, model_id: str, api_model_id: str,
                region: str, api_key: str | None) -> list[dict[str, Any]]:
     creds: dict[str, str] = {}
@@ -141,16 +110,20 @@ def _call_llm(incidents: list[Any], *, backend: str, model_id: str, api_model_id
             if v:
                 creds[k.lower()] = v
 
-    pred = predict_submission_from_incidents(
-        incidents,
-        backend=backend,  # type: ignore[arg-type]
-        allowed_attack_types=DEFAULT_ALLOWED_ATTACK_TYPES,
-        region=region,
-        model_id=model_id,
-        api_key=api_key,
-        api_model_id=api_model_id,
-        inline_aws_credentials=creds or None,
-    )
+    try:
+        pred = predict_submission_from_incidents(
+            incidents,
+            backend=backend,  # type: ignore[arg-type]
+            allowed_attack_types=DEFAULT_ALLOWED_ATTACK_TYPES,
+            region=region,
+            model_id=model_id,
+            api_key=api_key,
+            api_model_id=api_model_id,
+            inline_aws_credentials=creds or None,
+        )
+    except Exception as exc:
+        raise RuntimeError("LLM prediction failed") from exc
+
     rows = pred if isinstance(pred, list) else ([pred] if pred else [])
     return [r for r in rows if isinstance(r, dict)]
 
@@ -165,8 +138,6 @@ def main() -> None:
                         help="Répertoire des fichiers JSONL (défaut : LOCAL_LOGS_DIR ou datasets/finale/ingestion)")
     parser.add_argument("--output", type=Path, default=None,
                         help="Fichier de sortie (défaut : database/alerts.json)")
-    parser.add_argument("--no-llm", action="store_true",
-                        help="Saute l'appel LLM, écrit des alertes simplifiées depuis les incidents")
     args = parser.parse_args()
 
     ingestion_dir = (
@@ -193,31 +164,22 @@ def main() -> None:
     incidents = aggregate_signals(all_signals)
     print(f"      {len(incidents)} incident(s) agrégé(s)\n")
 
-    if not incidents:
-        print("Aucun incident détecté — alerts.json non modifié.")
-        return
+    backend = (os.getenv("MODEL_BACKEND") or "bedrock").strip()
+    api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip() or None
+    if backend == "api" and not api_key:
+        raise SystemExit("MODEL_BACKEND=api requires ANTHROPIC_API_KEY")
 
-    # 3. LLM ou fallback
-    if args.no_llm:
-        print("[3/3] Mode --no-llm : alertes simplifiées depuis les incidents")
-        alerts = _simplified_alerts_from_incidents(incidents)
-    else:
-        backend = (os.getenv("MODEL_BACKEND") or "").strip()
-        api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip() or None
-        if not backend:
-            backend = "api" if api_key else "bedrock"
+    model_id = (os.getenv("BEDROCK_MODEL_ID") or MODEL_ID_DEFAULT).strip()
+    api_model_id = (os.getenv("ANTHROPIC_MODEL_ID") or API_MODEL_ID_DEFAULT).strip()
+    region = (os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "eu-west-3").strip()
 
-        model_id = (os.getenv("BEDROCK_MODEL_ID") or MODEL_ID_DEFAULT).strip()
-        api_model_id = (os.getenv("ANTHROPIC_MODEL_ID") or API_MODEL_ID_DEFAULT).strip()
-        region = (os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "eu-west-3").strip()
-
-        label = f"api/{api_model_id}" if backend == "api" else f"bedrock/{model_id}"
-        print(f"[3/3] Appel LLM ({label}) ...")
-        t3 = time.perf_counter()
-        raw_preds = _call_llm(incidents, backend=backend, model_id=model_id,
-                              api_model_id=api_model_id, region=region, api_key=api_key)
-        print(f"      {len(raw_preds)} prédiction(s) reçues en {time.perf_counter()-t3:.1f}s")
-        alerts = [_to_alert_record(p, i + 1) for i, p in enumerate(raw_preds)]
+    label = f"api/{api_model_id}" if backend == "api" else f"bedrock/{model_id}"
+    print(f"[3/3] Appel LLM obligatoire ({label}) ...")
+    t3 = time.perf_counter()
+    raw_preds = _call_llm(incidents, backend=backend, model_id=model_id,
+                          api_model_id=api_model_id, region=region, api_key=api_key)
+    print(f"      {len(raw_preds)} prédiction(s) reçues en {time.perf_counter()-t3:.1f}s")
+    alerts = [_to_alert_record(p, i + 1) for i, p in enumerate(raw_preds)]
 
     # Écriture
     output_path.parent.mkdir(parents=True, exist_ok=True)

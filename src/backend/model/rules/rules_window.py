@@ -1590,10 +1590,19 @@ def detect_signals_window_1h(
     # --- Emit SQL_INJECTION_SQLMAP_UA signals (strong indicator) ---
     for ip, n in sqli_sqlmap_by_ip.items():
         if n >= sqli_sqlmap_threshold:
+            dts = sqli_ts_by_ip.get(ip, [])
+            if dts:
+                dts_sorted = sorted(dts)
+                sig_ts = dts_sorted[0].isoformat().replace("+00:00", "Z")
+                sig_ts_end = dts_sorted[-1].isoformat().replace("+00:00", "Z")
+            else:
+                sig_ts = "1970-01-01T00:00:00Z"
+                sig_ts_end = sig_ts
             signals.append(
                 {
                     "rule_id": "SQL_INJECTION_SQLMAP_UA",
-                    "ts": "1970-01-01T00:00:00Z",
+                    "ts": sig_ts,
+                    "ts_end": sig_ts_end,
                     "source_ip": ip,
                     "iocs": {"sqlmap_hits": int(n), "window_seconds": WINDOW_SECONDS},
                 }

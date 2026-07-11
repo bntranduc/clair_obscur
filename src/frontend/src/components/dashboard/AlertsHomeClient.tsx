@@ -10,9 +10,9 @@ import {
   uniqueAttackTypes,
   type AlertsFilterState,
 } from "@/lib/filterAlerts";
-import type { ModelAlert } from "@/types/modelPrediction";
+import type { AlertCatalogItem } from "@/types/alertsCatalog";
 
-export default function AlertsHomeClient({ alerts }: { alerts: ModelAlert[] }) {
+export default function AlertsHomeClient({ alerts }: { alerts: AlertCatalogItem[] }) {
   const [layout, setLayout] = useState<AlertsLayoutMode>("grid");
   const [filter, setFilter] = useState<AlertsFilterState>(() => defaultAlertsFilterState());
 
@@ -25,8 +25,8 @@ export default function AlertsHomeClient({ alerts }: { alerts: ModelAlert[] }) {
         <header className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">Alertes</h1>
           <p className="max-w-3xl text-[15px] leading-relaxed text-zinc-400">
-            Prédictions du modèle (jeu de démonstration). Aperçu rapide via le bouton à côté du type, ou ouverture de la
-            fiche complète. Chaque étiquette indique la date de début de l’attaque.
+            Catalogue d’alertes détectées par le pipeline (règles + LLM). Aperçu rapide via le bouton à côté du type,
+            ou ouverture de la fiche complète.
           </p>
         </header>
         <AlertsListToolbar mode={layout} onModeChange={setLayout} />

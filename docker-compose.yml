@@ -7,20 +7,10 @@ services:
       - "8020:8020"
     env_file: .env
     environment:
-      LOCAL_LOGS_DIR: /data/ingestion
+      LOCAL_LOGS_DIR: /data/sample_logs
     volumes:
-      - ./datasets/finale/ingestion:/data/ingestion:ro
       - ./database:/app/database
-    restart: unless-stopped
-
-  llm:
-    build:
-      context: ./src/llm
-      dockerfile: Dockerfile
-    ports:
-      - "8030:8030"
-    volumes:
-      - ${LLM_CHECKPOINTS_DIR:-../llm/checkpoints}:/app/checkpoints:ro
+      - ./data/sample_logs:/data/sample_logs:ro
     restart: unless-stopped
 
   frontend:

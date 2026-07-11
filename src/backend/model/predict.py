@@ -24,23 +24,26 @@ def predict_alerts(
     api_key: str | None = None,
     api_model_id: str = API_MODEL_ID_DEFAULT,
 ) -> list[dict[str, Any]]:
+    """Règles → agrégation → LLM obligatoire (Bedrock ou API). Aucun repli sans appel modèle."""
     incidents = aggregate_signals(detect_signals_window_1h(events))
-    if not incidents:
-        return []
-    out = predict_submission_from_incidents(
-        incidents,
-        backend=backend,
-        allowed_attack_types=DEFAULT_ALLOWED_ATTACK_TYPES,
-        region=region,
-        model_id=model_id or MODEL_ID_DEFAULT,
-        max_tokens=max_tokens,
-        profile_name=profile_name,
-        inline_aws_credentials=inline_aws_credentials,
-        api_key=api_key,
-        api_model_id=api_model_id,
-    )
+    try:
+        out = predict_submission_from_incidents(
+            incidents,
+            backend=backend,
+            allowed_attack_types=DEFAULT_ALLOWED_ATTACK_TYPES,
+            region=region,
+            model_id=model_id or MODEL_ID_DEFAULT,
+            max_tokens=max_tokens,
+            profile_name=profile_name,
+            inline_aws_credentials=inline_aws_credentials,
+            api_key=api_key,
+            api_model_id=api_model_id,
+        )
+    except Exception as exc:
+        raise RuntimeError("LLM prediction failed") from exc
+
     if isinstance(out, list):
         return [x for x in out if isinstance(x, dict)]
     if isinstance(out, dict):
         return [out]
-    return []
+    raise RuntimeError(f"LLM returned unexpected type: {type(out).__name__}")

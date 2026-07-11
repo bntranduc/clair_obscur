@@ -1,4 +1,4 @@
-import type { SeverityLevel } from "@/types/modelPrediction";
+import type { SeverityLevel } from "@/types/alertsCatalog";
 
 /** Accent couleur par niveau de criticité (fiche alerte compacte). */
 export const SEVERITY_VISUAL: Record<

@@ -1,7 +1,16 @@
-import type { SeverityLevel } from "@/types/modelPrediction";
+import type { SeverityLevel } from "@/types/alertsCatalog";
+
+function asSeverity(v: string): SeverityLevel {
+  if (v === "low" || v === "medium" || v === "high" || v === "critical") return v;
+  return "medium";
+}
 
 /** Fond et bordure d’étiquette alerte selon la criticité (bordure lisible, fond teinté). */
-export function alertCardSurfaceClass(severity: SeverityLevel): string {
+export function alertCardSurfaceClass(severity: string): string {
+  return alertCardSurfaceClassForLevel(asSeverity(severity));
+}
+
+function alertCardSurfaceClassForLevel(severity: SeverityLevel): string {
   const inset = "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] transition-all border-2";
   switch (severity) {
     case "low":

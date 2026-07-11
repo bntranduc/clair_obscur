@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, FilterX } from "lucide-react";
-import type { SeverityLevel } from "@/types/modelPrediction";
+import type { SeverityLevel } from "@/types/alertsCatalog";
 import { attackDisplayName } from "@/lib/attackLabels";
 import type { AlertsFilterState } from "@/lib/filterAlerts";
 import { defaultAlertsFilterState } from "@/lib/filterAlerts";

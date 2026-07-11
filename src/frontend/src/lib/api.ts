@@ -11,20 +11,6 @@ function getApiUrl(): string {
 /** Même origine CORS que l’API (``allow_credentials=False`` → pas de cookies cross-origin). */
 const apiFetchInit: RequestInit = { cache: "no-store", credentials: "omit" };
 
-/** Query optionnelle : pagination / bucket S3. Les creds AWS restent côté API (rôle IAM ou ``.env`` du conteneur). */
-export type FetchNormalizedLogsOptions = {
-  raw_logs_bucket?: string;
-  raw_logs_prefix?: string;
-  region?: string;
-};
-
-export type NormalizedLogsPage = {
-  items: NormalizedEvent[];
-  has_more: boolean;
-  skip: number;
-  limit: number;
-};
-
 /** Pagination par curseur (DynamoDB) — pas de clés AWS dans l’URL. */
 export type NormalizedLogsDynamoPage = {
   items: NormalizedEvent[];
@@ -39,7 +25,7 @@ export type FetchNormalizedLogsDynamoOptions = {
   region?: string;
 };
 
-/** Partition DynamoDB côté navigateur (build Next) — même rôle que ``DYNAMODB_PK`` dans ``test.py``. */
+/** Partition DynamoDB côté navigateur (build Next) — alias de ``DYNAMODB_PK`` côté API. */
 function dynamoPkFromEnv(): string | undefined {
   if (typeof process === "undefined" || !process.env?.NEXT_PUBLIC_DYNAMODB_PK) return undefined;
   const v = process.env.NEXT_PUBLIC_DYNAMODB_PK.trim();
@@ -73,36 +59,6 @@ export async function fetchNormalizedLogsFromDynamodb(
     throw new Error(`GET /api/v1/logs/dynamodb failed (${res.status}): ${String(detail).slice(0, 800)}`.trim());
   }
   return (await res.json()) as NormalizedLogsDynamoPage;
-}
-
-export async function fetchNormalizedLogs(
-  params: { skip?: number; limit?: number },
-  options?: FetchNormalizedLogsOptions,
-): Promise<NormalizedLogsPage> {
-  const sp = new URLSearchParams();
-  sp.set("skip", String(params.skip ?? 0));
-  sp.set("limit", String(params.limit ?? 50));
-  if (options?.raw_logs_bucket?.trim()) sp.set("raw_logs_bucket", options.raw_logs_bucket.trim());
-  if (options?.raw_logs_prefix?.trim()) sp.set("raw_logs_prefix", options.raw_logs_prefix.trim());
-  if (options?.region?.trim()) sp.set("region", options.region.trim());
-
-  const q = sp.toString();
-  const url = `${getApiUrl()}/api/v1/logs/normalized${q ? `?${q}` : ""}`;
-  const res = await fetch(url, apiFetchInit);
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    let detail = text;
-    try {
-      const j = JSON.parse(text) as { detail?: unknown };
-      if (typeof j.detail === "string") detail = j.detail;
-      else if (Array.isArray(j.detail))
-        detail = j.detail.map((x: unknown) => (typeof x === "string" ? x : JSON.stringify(x))).join("; ");
-    } catch {
-      /* keep raw */
-    }
-    throw new Error(`GET /api/v1/logs/normalized failed (${res.status}): ${String(detail).slice(0, 800)}`.trim());
-  }
-  return (await res.json()) as NormalizedLogsPage;
 }
 
 export type FetchSiemAnalyticsOptions = {
@@ -240,54 +196,6 @@ export async function fetchAlertClustering(options?: {
     throw new Error(`GET /api/v1/alerts/clustering failed (${res.status}): ${String(detail).slice(0, 800)}`.trim());
   }
   return (await res.json()) as AlertClusteringResponse;
-}
-
-export type ChatApiMessage = { role: "user" | "assistant"; content: string };
-
-export type ChatApiResponse = { reply: string };
-
-export type PostChatOptions = {
-  region?: string;
-  aws_access_key_id?: string;
-  aws_secret_access_key?: string;
-  aws_session_token?: string;
-};
-
-/** Assistant IA (Bedrock) — ``POST /api/v1/chat`` sur l’API EC2. Identifiants optionnels (déconseillé côté navigateur). */
-export async function postChat(messages: ChatApiMessage[], options?: PostChatOptions): Promise<ChatApiResponse> {
-  const url = `${getApiUrl()}/api/v1/chat`;
-  const trimmed = messages.slice(-24);
-  const payload: Record<string, unknown> = { messages: trimmed };
-  if (options?.region?.trim()) payload.region = options.region.trim();
-  const ak = options?.aws_access_key_id?.trim();
-  const sk = options?.aws_secret_access_key?.trim();
-  const st = options?.aws_session_token?.trim();
-  if (ak && sk) {
-    payload.aws_access_key_id = ak;
-    payload.aws_secret_access_key = sk;
-    if (st) payload.aws_session_token = st;
-  }
-
-  const res = await fetch(url, {
-    ...apiFetchInit,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    let detail = text;
-    try {
-      const j = JSON.parse(text) as { detail?: unknown };
-      if (typeof j.detail === "string") detail = j.detail;
-      else if (Array.isArray(j.detail))
-        detail = j.detail.map((x: unknown) => (typeof x === "string" ? x : JSON.stringify(x))).join("; ");
-    } catch {
-      /* keep raw */
-    }
-    throw new Error(`POST /api/v1/chat failed (${res.status}): ${String(detail).slice(0, 600)}`.trim());
-  }
-  return (await res.json()) as ChatApiResponse;
 }
 
 // ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from boto3.dynamodb.conditions import Key
@@ -111,39 +111,22 @@ def _query_partition_recent(
     return out, truncated
 
 
-def get_dynamodb_dashboard(
+def _build_dashboard_from_events(
+    events: list[dict[str, Any]],
     *,
-    pk: str | None = None,
-    max_items: int = 15_000,
-    region: str | None = None,
-    table_name: str | None = None,
-    since: str | None = None,
-    until: str | None = None,
-    timeline_granularity: str = "hour",
+    data_source: str,
+    pk_label: str,
+    items_fetched: int,
+    truncated: bool,
+    since: str | None,
+    until: str | None,
+    timeline_granularity: str,
 ) -> dict[str, Any]:
-    """Construit un objet compatible ``SiemDashboard`` (champ ``data_source``: ``dynamodb``).
-
-    Lit jusqu’à ``max_items`` lignes récentes sur la partition, applique ensuite un filtre optionnel
-    sur le champ ``timestamp`` de chaque log (``since`` / ``until`` inclusifs).
-    """
-    reg = (region or os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "eu-west-3").strip()
-    table = (table_name or os.getenv("DYNAMODB_TABLE", "normalized-logs")).strip()
-    pk_resolved = (pk or "").strip() or default_logs_partition_key()
-    cap = max(100, min(int(max_items), DYNAMODB_ANALYTICS_MAX_ITEMS_CAP))
     s_f = (since or "").strip()
     u_f = (until or "").strip()
     gran = (timeline_granularity or "hour").strip().lower()
     if gran not in ("hour", "minute"):
         gran = "hour"
-
-    events, truncated = _query_partition_recent(
-        pk=pk_resolved,
-        max_items=cap,
-        region=reg,
-        table=table,
-    )
-    dynamodb_items_fetched = len(events)
-    events = _filter_events_by_log_timestamp(events, s_f or None, u_f or None)
 
     total = len(events)
     by_source = Counter()
@@ -246,10 +229,10 @@ def get_dynamodb_dashboard(
         "top_source_ips": top_source_ips,
         "system_by_severity": [{"key": k, "count": v} for k, v in severities.most_common(15)],
         "geo_logs": geo_logs,
-        "data_source": "dynamodb",
-        "dynamodb_pk": pk_resolved,
-        "dynamodb_items_fetched": dynamodb_items_fetched,
-        "dynamodb_items_scanned": dynamodb_items_fetched,
+        "data_source": data_source,
+        "dynamodb_pk": pk_label,
+        "dynamodb_items_fetched": items_fetched,
+        "dynamodb_items_scanned": items_fetched,
         "dynamodb_truncated": truncated,
         "dynamodb_sample_timestamp_first": ts_first,
         "dynamodb_sample_timestamp_last": ts_last,
@@ -257,3 +240,78 @@ def get_dynamodb_dashboard(
         "time_filter_since": s_f or None,
         "time_filter_until": u_f or None,
     }
+
+
+def get_local_logs_dashboard(
+    local_dir: str | Path,
+    *,
+    max_items: int = 15_000,
+    since: str | None = None,
+    until: str | None = None,
+    timeline_granularity: str = "hour",
+) -> dict[str, Any]:
+    """Agrégations depuis ``LOCAL_LOGS_DIR`` (``data_source`` = ``local``)."""
+    from backend.log.local_logs import load_events_up_to
+
+    cap = max(100, min(int(max_items), DYNAMODB_ANALYTICS_MAX_ITEMS_CAP))
+    fetched = load_events_up_to(local_dir, max_items=cap)
+    truncated = len(fetched) >= cap
+    s_f = (since or "").strip()
+    u_f = (until or "").strip()
+    events = _filter_events_by_log_timestamp(fetched, s_f or None, u_f or None)
+    return _build_dashboard_from_events(
+        events,
+        data_source="local",
+        pk_label=f"local:{local_dir}",
+        items_fetched=len(fetched),
+        truncated=truncated,
+        since=since,
+        until=until,
+        timeline_granularity=timeline_granularity,
+    )
+
+
+def get_dynamodb_dashboard(
+    *,
+    pk: str | None = None,
+    max_items: int = 15_000,
+    region: str | None = None,
+    table_name: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    timeline_granularity: str = "hour",
+) -> dict[str, Any]:
+    """Construit un objet compatible ``SiemDashboard`` (champ ``data_source``: ``dynamodb``).
+
+    Lit jusqu’à ``max_items`` lignes récentes sur la partition, applique ensuite un filtre optionnel
+    sur le champ ``timestamp`` de chaque log (``since`` / ``until`` inclusifs).
+    """
+    reg = (region or os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "eu-west-3").strip()
+    table = (table_name or os.getenv("DYNAMODB_TABLE", "normalized-logs")).strip()
+    pk_resolved = (pk or "").strip() or default_logs_partition_key()
+    cap = max(100, min(int(max_items), DYNAMODB_ANALYTICS_MAX_ITEMS_CAP))
+    s_f = (since or "").strip()
+    u_f = (until or "").strip()
+    gran = (timeline_granularity or "hour").strip().lower()
+    if gran not in ("hour", "minute"):
+        gran = "hour"
+
+    events, truncated = _query_partition_recent(
+        pk=pk_resolved,
+        max_items=cap,
+        region=reg,
+        table=table,
+    )
+    dynamodb_items_fetched = len(events)
+    events = _filter_events_by_log_timestamp(events, s_f or None, u_f or None)
+
+    return _build_dashboard_from_events(
+        events,
+        data_source="dynamodb",
+        pk_label=pk_resolved,
+        items_fetched=dynamodb_items_fetched,
+        truncated=truncated,
+        since=since,
+        until=until,
+        timeline_granularity=gran,
+    )
