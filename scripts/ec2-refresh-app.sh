@@ -6,15 +6,27 @@ APP_DIR="/opt/clair-obscur"
 ENV_FILE="/etc/clair-obscur/app.env"
 
 if ! swapon --show | grep -q /swapfile; then
-  fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048
-  chmod 600 /swapfile
-  mkswap /swapfile
-  swapon /swapfile
+  if [[ ! -f /swapfile ]]; then
+    fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048
+    chmod 600 /swapfile
+    mkswap /swapfile
+  fi
+  swapon /swapfile 2>/dev/null || true
 fi
 
-PUBLIC_IP="$(curl -sf http://169.254.169.254/latest/meta-data/public-ipv4 || true)"
+PUBLIC_IP="${PUBLIC_IP:-}"
 if [[ -z "$PUBLIC_IP" ]]; then
-  echo "public IP introuvable (metadata EC2)" >&2
+  TOKEN="$(curl -sf -X PUT "http://169.254.169.254/latest/api/token" \
+    -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" || true)"
+  if [[ -n "$TOKEN" ]]; then
+    PUBLIC_IP="$(curl -sf -H "X-aws-ec2-metadata-token: $TOKEN" \
+      http://169.254.169.254/latest/meta-data/public-ipv4 || true)"
+  else
+    PUBLIC_IP="$(curl -sf http://169.254.169.254/latest/meta-data/public-ipv4 || true)"
+  fi
+fi
+if [[ -z "$PUBLIC_IP" ]]; then
+  echo "public IP introuvable (metadata EC2); export PUBLIC_IP=... avant le script" >&2
   exit 1
 fi
 
