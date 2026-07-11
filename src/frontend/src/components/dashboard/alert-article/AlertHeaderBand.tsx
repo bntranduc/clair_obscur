@@ -10,7 +10,7 @@ export default function AlertHeaderBand({
   compact,
 }: {
   challengeId: string;
-  pipelineSeconds: number;
+  pipelineSeconds?: number;
   title: string;
   summary: string;
   severityLabel: string;
@@ -29,7 +29,7 @@ export default function AlertHeaderBand({
               <span aria-hidden className="text-zinc-700">
                 ·
               </span>
-              <span>Pipeline {pipelineSeconds}s</span>
+              <span>Pipeline {pipelineSeconds != null ? `${pipelineSeconds}s` : "—"}</span>
             </div>
             <h1
               className={`mt-1 font-semibold leading-tight text-white ${compact ? "text-base" : "text-xl sm:text-2xl lg:text-3xl"}`}
