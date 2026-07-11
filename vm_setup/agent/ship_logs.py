@@ -105,11 +105,19 @@ def s3_key(prefix: str) -> str:
 def ship(events: list[dict]) -> str | None:
     if not events:
         return None
+
+    ship_mode = (os.getenv("SHIP_MODE") or "").strip().lower()
+    api_token = (os.getenv("VM_API_TOKEN") or "").strip()
+    api_base = (os.getenv("API_BASE") or "").strip().rstrip("/")
+
+    if ship_mode == "api" or (api_token and api_base):
+        return _ship_via_api(events, api_base=api_base, api_token=api_token)
+
     bucket = (os.getenv("RAW_LOGS_BUCKET") or "").strip()
     prefix = (os.getenv("RAW_LOGS_PREFIX") or "raw/opensearch/logs-raw/").strip()
     region = (os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "eu-west-3").strip()
     if not bucket:
-        raise RuntimeError("RAW_LOGS_BUCKET requis dans vm-agent.env")
+        raise RuntimeError("RAW_LOGS_BUCKET requis dans vm-agent.env (ou SHIP_MODE=api)")
 
     body = "\n".join(json.dumps(e, ensure_ascii=False) for e in events) + "\n"
     key = s3_key(prefix)
@@ -121,6 +129,32 @@ def ship(events: list[dict]) -> str | None:
         ContentType="application/x-ndjson",
     )
     return f"s3://{bucket}/{key}"
+
+
+def _ship_via_api(events: list[dict], *, api_base: str, api_token: str) -> str:
+    if not api_base or not api_token:
+        raise RuntimeError("API_BASE et VM_API_TOKEN requis pour SHIP_MODE=api")
+    import urllib.error
+    import urllib.request
+
+    payload = json.dumps({"events": events}).encode("utf-8")
+    req = urllib.request.Request(
+        f"{api_base}/api/v1/vms/ship",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_token}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"API ship failed ({e.code}): {body[:500]}") from e
+    uri = data.get("s3_uri") or "api"
+    return str(uri)
 
 
 def main() -> None:

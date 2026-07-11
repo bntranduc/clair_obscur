@@ -79,6 +79,16 @@ output "dynamodb_alerts_default_pk" {
   value       = local.dynamodb_alerts_default_pk
 }
 
+output "dynamodb_vms_table_name" {
+  description = "Table registre VMs (DYNAMODB_VMS_TABLE)."
+  value       = module.vm_registry.table_name
+}
+
+output "dynamodb_vms_table_arn" {
+  description = "ARN table registre VMs."
+  value       = module.vm_registry.table_arn
+}
+
 # --- SQS ---
 
 output "sqs_predict_queue_url" {
@@ -205,6 +215,7 @@ output "env_snippet" {
     DYNAMODB_PK=${local.dynamodb_default_pk}
     DYNAMODB_ALERTS_TABLE=${module.alerts.table_name}
     DYNAMODB_ALERTS_PK=${local.dynamodb_alerts_default_pk}
+    DYNAMODB_VMS_TABLE=${module.vm_registry.table_name}
     ALERTS_SOURCE=dynamodb
     SQS_QUEUE_URL=${module.predict_queue.queue_url}
     SQS_VISIBILITY_TIMEOUT=${var.sqs_visibility_timeout_seconds}

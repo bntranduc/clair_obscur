@@ -70,6 +70,12 @@ variable "dynamodb_alerts_table_name" {
   default     = ""
 }
 
+variable "dynamodb_vms_table_name" {
+  description = "Nom table DynamoDB registre VMs. Vide = clair-obscur-<account_id>-vm-registry."
+  type        = string
+  default     = ""
+}
+
 variable "dynamodb_demo_day" {
   description = "Jour ISO (YYYY-MM-DD) pour DYNAMODB_PK par défaut (aligné sur demo.jsonl)."
   type        = string

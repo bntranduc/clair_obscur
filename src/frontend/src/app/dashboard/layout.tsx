@@ -14,6 +14,7 @@ import {
   ChevronsRight,
   MessageCircle,
   Network,
+  Server,
 } from "lucide-react";
 import UserMenu from "@/components/UserMenu";
 import AgenticChatAssistant from "@/components/dashboard/AgenticChatAssistant";
@@ -141,6 +142,7 @@ export default function DashboardLayout({
           </NavSection>
 
           <NavSection title="Système">
+            <NavLink href="/dashboard/vms" icon={<Server size={18} strokeWidth={2} />} label="VMs connectées" />
             <NavLink href="/dashboard/settings" icon={<Settings size={18} strokeWidth={2} />} label="Paramètres" />
           </NavSection>
         </nav>

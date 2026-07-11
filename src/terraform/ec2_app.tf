@@ -97,18 +97,23 @@ resource "aws_iam_role_policy" "app" {
           "dynamodb:GetItem",
           "dynamodb:Scan",
           "dynamodb:DescribeTable",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
         ]
         Resource = [
           module.normalized_logs.table_arn,
           "${module.normalized_logs.table_arn}/index/*",
           module.alerts.table_arn,
           "${module.alerts.table_arn}/index/*",
+          module.vm_registry.table_arn,
+          "${module.vm_registry.table_arn}/index/*",
         ]
       },
       {
-        Sid    = "S3LogsRead"
+        Sid    = "S3LogsReadWrite"
         Effect = "Allow"
-        Action = ["s3:GetObject", "s3:ListBucket"]
+        Action = ["s3:GetObject", "s3:ListBucket", "s3:PutObject"]
         Resource = [
           module.raw_logs.bucket_arn,
           "${module.raw_logs.bucket_arn}/*",
@@ -162,6 +167,7 @@ resource "aws_instance" "app" {
     dynamodb_pk           = local.dynamodb_default_pk
     dynamodb_alerts_table = module.alerts.table_name
     dynamodb_alerts_pk    = local.dynamodb_alerts_default_pk
+    dynamodb_vms_table    = module.vm_registry.table_name
     bedrock_model_id      = var.worker_bedrock_model_id
   })
 

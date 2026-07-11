@@ -42,6 +42,7 @@ DYNAMODB_TABLE=${dynamodb_table}
 DYNAMODB_PK=${dynamodb_pk}
 DYNAMODB_ALERTS_TABLE=${dynamodb_alerts_table}
 DYNAMODB_ALERTS_PK=${dynamodb_alerts_pk}
+DYNAMODB_VMS_TABLE=${dynamodb_vms_table}
 ALERTS_SOURCE=dynamodb
 BEDROCK_MODEL_ID=${bedrock_model_id}
 API_PORT=8020

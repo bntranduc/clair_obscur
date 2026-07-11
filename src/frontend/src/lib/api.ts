@@ -1,6 +1,7 @@
 import type { NormalizedEvent } from "@/lib/normalizedLog";
 import type { AlertsCatalogResponse } from "@/types/alertsCatalog";
 import type { SiemDashboard } from "@/types/siemAnalytics";
+import type { VmActionResponse, VmsListResponse } from "@/types/vms";
 import { getBackendBaseUrl } from "@/lib/apiBackendUrl";
 
 /** URL de base FastAPI (ex. EC2). Équivaut à un ``curl`` sur la même URL. */
@@ -357,4 +358,44 @@ export async function fetchAgentCatalog(): Promise<AgentCatalogResponse> {
   throw new Error(
     `Catalogue agents (${lastStatus})${lastBody ? `: ${lastBody.slice(0, 240)}` : ""}.${hint}`.trim(),
   );
+}
+
+export async function fetchVms(): Promise<VmsListResponse> {
+  const url = `${getApiUrl()}/api/v1/vms`;
+  const res = await fetch(url, apiFetchInit);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`GET /api/v1/vms failed (${res.status}): ${text.slice(0, 400)}`);
+  }
+  return (await res.json()) as VmsListResponse;
+}
+
+export async function approveVm(vmId: string): Promise<VmActionResponse> {
+  const url = `${getApiUrl()}/api/v1/vms/${encodeURIComponent(vmId)}/approve`;
+  const res = await fetch(url, { ...apiFetchInit, method: "POST" });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Approbation échouée (${res.status}): ${text.slice(0, 400)}`);
+  }
+  return (await res.json()) as VmActionResponse;
+}
+
+export async function rejectVm(vmId: string): Promise<VmActionResponse> {
+  const url = `${getApiUrl()}/api/v1/vms/${encodeURIComponent(vmId)}/reject`;
+  const res = await fetch(url, { ...apiFetchInit, method: "POST" });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Rejet échoué (${res.status}): ${text.slice(0, 400)}`);
+  }
+  return (await res.json()) as VmActionResponse;
+}
+
+export async function revokeVm(vmId: string): Promise<VmActionResponse> {
+  const url = `${getApiUrl()}/api/v1/vms/${encodeURIComponent(vmId)}`;
+  const res = await fetch(url, { ...apiFetchInit, method: "DELETE" });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Révocation échouée (${res.status}): ${text.slice(0, 400)}`);
+  }
+  return (await res.json()) as VmActionResponse;
 }

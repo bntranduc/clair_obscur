@@ -23,6 +23,11 @@ locals {
     "${var.project_name}-${local.account_suffix}-alerts",
   )
 
+  dynamodb_vms_table_name = coalesce(
+    var.dynamodb_vms_table_name != "" ? var.dynamodb_vms_table_name : null,
+    "${var.project_name}-${local.account_suffix}-vm-registry",
+  )
+
   dynamodb_alerts_default_pk = "ALERTS"
 
   # Partition par défaut pour la démo (demo.jsonl → jour 2026-01-12).

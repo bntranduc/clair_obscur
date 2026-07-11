@@ -36,6 +36,7 @@ from api.agent_catalog import build_agent_catalog  # noqa: E402
 from api.agentic_bridge import _repo_root  # noqa: E402
 from api.agentic_router import router as agentic_router  # noqa: E402
 from api.chat_router import router as chat_router  # noqa: E402
+from api.vm_router import router as vm_router  # noqa: E402
 from backend.agentic.config.loader import load_config  # noqa: E402
 
 API_V1 = "/api/v1"
@@ -72,6 +73,7 @@ app.add_middleware(
 )
 app.include_router(chat_router)
 app.include_router(agentic_router)
+app.include_router(vm_router)
 
 
 @app.get(f"{API_V1}/agents/catalog")
@@ -97,6 +99,7 @@ def health() -> dict[str, Any]:
         "local_logs_dir": str(local) if local else None,
         "dynamodb_table": (os.getenv("DYNAMODB_TABLE") or "").strip() or None,
         "dynamodb_alerts_table": (os.getenv("DYNAMODB_ALERTS_TABLE") or "").strip() or None,
+        "dynamodb_vms_table": (os.getenv("DYNAMODB_VMS_TABLE") or "").strip() or None,
     }
 
 

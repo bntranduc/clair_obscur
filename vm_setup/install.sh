@@ -1,28 +1,50 @@
 #!/usr/bin/env bash
-# Installe l'agent VM CLAIR OBSCUR (nginx démo + ship_logs → S3).
+# Installe l'agent VM CLAIR OBSCUR (nginx démo + ship_logs → S3 ou API).
 # Usage :
-#   sudo RAW_LOGS_BUCKET=... RAW_LOGS_PREFIX=raw/opensearch/logs-raw/ AWS_REGION=eu-west-3 ./install.sh
-#   ou configurer /etc/clair-obscur/vm-agent.env avant install.
+#   sudo ./install.sh --profile demo
+#   sudo RAW_LOGS_BUCKET=... ./install.sh --profile sensor
+#   sudo ./connect.sh --api-url http://...   # connexion à l'app (recommandé)
 set -euo pipefail
 
 VM_SETUP_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="/etc/clair-obscur/vm-agent.env"
 AGENT_DIR="/opt/clair-vm-agent"
 NGINX_PORT="${VM_NGINX_PORT:-8080}"
+PROFILE="demo"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --profile) PROFILE="$2"; shift 2 ;;
+    --profile=*) PROFILE="${1#*=}"; shift ;;
+    *) shift ;;
+  esac
+done
 
 if [[ "${EUID}" -ne 0 ]]; then
   echo "Relance avec sudo." >&2
   exit 1
 fi
 
-if command -v dnf >/dev/null 2>&1; then
-  dnf install -y nginx python3 python3-pip
-elif command -v apt-get >/dev/null 2>&1; then
-  apt-get update -y
-  apt-get install -y nginx python3 python3-pip python3-venv
+if [[ "$PROFILE" == "demo" || "$PROFILE" == "all" ]]; then
+  if command -v dnf >/dev/null 2>&1; then
+    dnf install -y nginx python3 python3-pip
+  elif command -v apt-get >/dev/null 2>&1; then
+    apt-get update -y
+    apt-get install -y nginx python3 python3-pip python3-venv
+  else
+    echo "OS non supporté (dnf/apt requis)." >&2
+    exit 1
+  fi
 else
-  echo "OS non supporté (dnf/apt requis)." >&2
-  exit 1
+  if command -v dnf >/dev/null 2>&1; then
+    dnf install -y python3 python3-pip curl
+  elif command -v apt-get >/dev/null 2>&1; then
+    apt-get update -y
+    apt-get install -y python3 python3-pip python3-venv curl
+  else
+    echo "OS non supporté (dnf/apt requis)." >&2
+    exit 1
+  fi
 fi
 
 mkdir -p /etc/clair-obscur /var/lib/clair-vm-agent
@@ -46,7 +68,8 @@ EOF
   fi
 fi
 
-# nginx démo (cible des attaques factices)
+# nginx démo (cible des attaques factices) — profil demo uniquement
+if [[ "$PROFILE" == "demo" || "$PROFILE" == "all" ]]; then
 install -d -m 755 /usr/share/clair-demo
 echo '<html><body><h1>clair demo target</h1></body></html>' > /usr/share/clair-demo/index.html
 
@@ -72,11 +95,12 @@ systemctl enable nginx
 systemctl restart nginx
 
 install -m 755 "$VM_SETUP_DIR/attacks/run_fake_attacks.sh" /usr/local/bin/clair-run-fake-attacks
+fi
 
-cat > /etc/systemd/system/clair-vm-agent.service <<'UNIT'
+cat > /etc/systemd/system/clair-vm-agent.service <<UNIT
 [Unit]
-Description=Clair Obscur VM log shipper (JSONL → S3)
-After=network-online.target nginx.service
+Description=Clair Obscur VM log shipper (JSONL → S3 ou API)
+After=network-online.target
 Wants=network-online.target
 
 [Service]
@@ -95,8 +119,11 @@ systemctl enable clair-vm-agent
 systemctl restart clair-vm-agent
 
 echo ""
-echo "Agent VM installé."
+echo "Agent VM installé (profil: $PROFILE)."
 echo "  Config   : $ENV_FILE"
-echo "  nginx    : http://127.0.0.1:${NGINX_PORT}"
-echo "  Attaques : clair-run-fake-attacks"
+if [[ "$PROFILE" == "demo" || "$PROFILE" == "all" ]]; then
+  echo "  nginx    : http://127.0.0.1:${NGINX_PORT}"
+  echo "  Attaques : clair-run-fake-attacks"
+fi
+echo "  Connexion: sudo ./connect.sh --api-url http://<app-ip>:8020"
 echo "  Logs     : journalctl -u clair-vm-agent -f"
