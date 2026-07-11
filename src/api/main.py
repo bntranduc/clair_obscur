@@ -96,6 +96,7 @@ def health() -> dict[str, Any]:
         "predictions_bucket": (os.getenv("PREDICTIONS_BUCKET") or os.getenv("OUTPUT_BUCKET") or "").strip() or None,
         "local_logs_dir": str(local) if local else None,
         "dynamodb_table": (os.getenv("DYNAMODB_TABLE") or "").strip() or None,
+        "dynamodb_alerts_table": (os.getenv("DYNAMODB_ALERTS_TABLE") or "").strip() or None,
     }
 
 

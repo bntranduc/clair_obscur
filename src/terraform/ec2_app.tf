@@ -101,6 +101,8 @@ resource "aws_iam_role_policy" "app" {
         Resource = [
           module.normalized_logs.table_arn,
           "${module.normalized_logs.table_arn}/index/*",
+          module.alerts.table_arn,
+          "${module.alerts.table_arn}/index/*",
         ]
       },
       {
@@ -110,15 +112,6 @@ resource "aws_iam_role_policy" "app" {
         Resource = [
           module.raw_logs.bucket_arn,
           "${module.raw_logs.bucket_arn}/*",
-        ]
-      },
-      {
-        Sid    = "S3PredictionsRead"
-        Effect = "Allow"
-        Action = ["s3:GetObject", "s3:ListBucket"]
-        Resource = [
-          module.predictions.bucket_arn,
-          "${module.predictions.bucket_arn}/*",
         ]
       },
       {
@@ -165,9 +158,11 @@ resource "aws_instance" "app" {
     raw_logs_prefix    = "${var.raw_logs_prefix}/"
     predictions_bucket = module.predictions.bucket_id
     predictions_prefix = "${var.predictions_prefix}/"
-    dynamodb_table     = module.normalized_logs.table_name
-    dynamodb_pk        = local.dynamodb_default_pk
-    bedrock_model_id   = var.worker_bedrock_model_id
+    dynamodb_table        = module.normalized_logs.table_name
+    dynamodb_pk           = local.dynamodb_default_pk
+    dynamodb_alerts_table = module.alerts.table_name
+    dynamodb_alerts_pk    = local.dynamodb_alerts_default_pk
+    bedrock_model_id      = var.worker_bedrock_model_id
   })
 
   root_block_device {

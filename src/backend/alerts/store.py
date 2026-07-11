@@ -27,9 +27,13 @@ def alerts_json_path() -> Path:
 def load_all_alerts() -> dict[str, Any]:
     """
     Retourne ``{ "alerts": [...], "count": n }``.
-    ``ALERTS_SOURCE=s3`` → bucket prédictions ; sinon fichier JSON local.
+    ``ALERTS_SOURCE=dynamodb`` → table alertes ; ``s3`` → bucket prédictions ; sinon fichier local.
     """
     source = (os.getenv("ALERTS_SOURCE") or "file").strip().lower()
+    if source == "dynamodb":
+        from backend.aws.dynamodb_alerts import load_all_alerts_from_dynamodb
+
+        return load_all_alerts_from_dynamodb()
     if source == "s3":
         from backend.alerts.s3_predictions import load_alerts_from_predictions_bucket
 

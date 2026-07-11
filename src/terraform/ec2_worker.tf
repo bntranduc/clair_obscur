@@ -110,6 +110,19 @@ resource "aws_iam_role_policy" "predict_worker" {
         Action   = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
         Resource = "*"
       },
+      {
+        Sid    = "DynamoDBAlertsWrite"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:BatchWriteItem",
+          "dynamodb:DescribeTable",
+        ]
+        Resource = [
+          module.alerts.table_arn,
+          "${module.alerts.table_arn}/index/*",
+        ]
+      },
     ]
   })
 }
@@ -151,6 +164,8 @@ resource "aws_instance" "predict_worker" {
     sqs_queue_url           = module.predict_queue.queue_url
     sqs_visibility_timeout = var.sqs_visibility_timeout_seconds
     bedrock_model_id       = var.worker_bedrock_model_id
+    dynamodb_alerts_table  = module.alerts.table_name
+    dynamodb_alerts_pk     = local.dynamodb_alerts_default_pk
   })
 
   root_block_device {

@@ -74,4 +74,16 @@ def process_one_message(
         )
         print(f"wrote s3://{cfg.output_bucket}/{out_key}", flush=True)
 
+        if isinstance(alerts, list) and alerts and cfg.dynamodb_alerts_table:
+            from backend.aws.dynamodb_alerts import put_alerts_to_dynamodb
+
+            n_written = put_alerts_to_dynamodb(
+                alerts,
+                meta=meta,
+                prediction_s3_key=out_key,
+                region=cfg.region,
+                table_name=cfg.dynamodb_alerts_table,
+            )
+            print(f"wrote dynamodb alerts={n_written} table={cfg.dynamodb_alerts_table}", flush=True)
+
     sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=receipt)

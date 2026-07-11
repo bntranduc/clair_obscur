@@ -19,6 +19,7 @@ class WorkerConfig:
     bedrock_model_id: str | None
     bedrock_max_tokens: int
     aws_profile: str | None
+    dynamodb_alerts_table: str | None
 
     @classmethod
     def from_env(cls) -> WorkerConfig:
@@ -43,4 +44,5 @@ class WorkerConfig:
             bedrock_model_id=mid,
             bedrock_max_tokens=int(os.getenv("BEDROCK_MAX_TOKENS", "4096")),
             aws_profile=prof,
+            dynamodb_alerts_table=(os.getenv("DYNAMODB_ALERTS_TABLE") or "").strip() or None,
         )

@@ -64,6 +64,21 @@ output "dynamodb_default_pk" {
   value       = local.dynamodb_default_pk
 }
 
+output "dynamodb_alerts_table_name" {
+  description = "Table alertes (DYNAMODB_ALERTS_TABLE)."
+  value       = module.alerts.table_name
+}
+
+output "dynamodb_alerts_table_arn" {
+  description = "ARN table alertes."
+  value       = module.alerts.table_arn
+}
+
+output "dynamodb_alerts_default_pk" {
+  description = "Partition key alertes (DYNAMODB_ALERTS_PK)."
+  value       = local.dynamodb_alerts_default_pk
+}
+
 # --- SQS ---
 
 output "sqs_predict_queue_url" {
@@ -158,6 +173,9 @@ output "env_snippet" {
     OUTPUT_PREFIX=${var.predictions_prefix}/
     DYNAMODB_TABLE=${module.normalized_logs.table_name}
     DYNAMODB_PK=${local.dynamodb_default_pk}
+    DYNAMODB_ALERTS_TABLE=${module.alerts.table_name}
+    DYNAMODB_ALERTS_PK=${local.dynamodb_alerts_default_pk}
+    ALERTS_SOURCE=dynamodb
     SQS_QUEUE_URL=${module.predict_queue.queue_url}
     SQS_VISIBILITY_TIMEOUT=${var.sqs_visibility_timeout_seconds}
     PREDICT_MODE=inline

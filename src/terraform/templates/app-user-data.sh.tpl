@@ -40,7 +40,9 @@ OUTPUT_BUCKET=${predictions_bucket}
 OUTPUT_PREFIX=${predictions_prefix}
 DYNAMODB_TABLE=${dynamodb_table}
 DYNAMODB_PK=${dynamodb_pk}
-ALERTS_SOURCE=s3
+DYNAMODB_ALERTS_TABLE=${dynamodb_alerts_table}
+DYNAMODB_ALERTS_PK=${dynamodb_alerts_pk}
+ALERTS_SOURCE=dynamodb
 BEDROCK_MODEL_ID=${bedrock_model_id}
 API_PORT=8020
 EOF

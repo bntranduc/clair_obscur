@@ -115,7 +115,7 @@ Test : re-upload un `.jsonl` dans le bucket raw logs → message SQS → JSON da
 
 `ec2_app.tf` : **t3.small**, `docker compose -f docker-compose.prod.yml`
 
-- Pas de `LOCAL_LOGS_DIR` — logs via DynamoDB, alertes via `ALERTS_SOURCE=s3`
+- Pas de `LOCAL_LOGS_DIR` — logs via DynamoDB, alertes via `ALERTS_SOURCE=dynamodb`
 - Ports **8020** (API) et **3000** (dashboard) ouverts (CIDR configurable)
 
 ```bash
