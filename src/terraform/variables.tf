@@ -109,7 +109,7 @@ variable "enable_ec2_worker" {
 variable "worker_instance_type" {
   description = "Type d'instance EC2 pour le worker."
   type        = string
-  default     = "t3.micro"
+  default     = "t3.small"
 }
 
 variable "worker_bedrock_model_id" {

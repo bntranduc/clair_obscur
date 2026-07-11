@@ -106,8 +106,8 @@ output "worker_refresh_command" {
   description = "Met a jour le worker sur l'EC2 : git pull + rebuild Docker (via SSM)."
   value = var.enable_ec2_worker ? (
     var.aws_profile != "" ?
-    "aws ssm send-command --instance-ids ${aws_instance.predict_worker[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git pull && docker build -f src/backend/worker/Dockerfile -t clair-predict-worker . && systemctl restart clair-predict-worker\"]' --region ${var.aws_region} --profile ${var.aws_profile}" :
-    "aws ssm send-command --instance-ids ${aws_instance.predict_worker[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git pull && docker build -f src/backend/worker/Dockerfile -t clair-predict-worker . && systemctl restart clair-predict-worker\"]' --region ${var.aws_region}"
+    "aws ssm send-command --instance-ids ${aws_instance.predict_worker[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git pull && bash scripts/ec2-refresh-worker.sh\"]' --region ${var.aws_region} --profile ${var.aws_profile}" :
+    "aws ssm send-command --instance-ids ${aws_instance.predict_worker[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git pull && bash scripts/ec2-refresh-worker.sh\"]' --region ${var.aws_region}"
   ) : null
 }
 

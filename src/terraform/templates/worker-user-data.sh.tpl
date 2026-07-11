@@ -6,9 +6,21 @@ APP_DIR="/opt/clair-obscur"
 ENV_FILE="/etc/clair-obscur/worker.env"
 IMAGE="clair-predict-worker:latest"
 
+ensure_swap() {
+  if swapon --show | grep -q /swapfile; then
+    return 0
+  fi
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+}
+
 dnf install -y docker git
 systemctl enable --now docker
 usermod -aG docker ec2-user || true
+ensure_swap
 
 if [[ -d "$APP_DIR/.git" ]]; then
   git -C "$APP_DIR" fetch origin "${git_ref}"
@@ -34,7 +46,7 @@ BEDROCK_MODEL_ID=${bedrock_model_id}
 BEDROCK_MAX_TOKENS=4096
 EOF
 
-cat > /etc/systemd/system/clair-predict-worker.service <<EOF
+cat > /etc/systemd/system/clair-predict-worker.service <<'UNITEOF'
 [Unit]
 Description=Clair Obscur SQS predict worker (Docker)
 After=docker.service network-online.target
@@ -47,14 +59,12 @@ Restart=always
 RestartSec=15
 ExecStartPre=-/usr/bin/docker stop clair-predict-worker
 ExecStartPre=-/usr/bin/docker rm clair-predict-worker
-ExecStart=/usr/bin/docker run --name clair-predict-worker \\
-  --env-file $${ENV_FILE} \\
-  $${IMAGE}
+ExecStart=/usr/bin/docker run --name clair-predict-worker --env-file /etc/clair-obscur/worker.env clair-predict-worker:latest
 ExecStop=/usr/bin/docker stop clair-predict-worker
 
 [Install]
 WantedBy=multi-user.target
-EOF
+UNITEOF
 
 systemctl daemon-reload
 systemctl enable clair-predict-worker
