@@ -145,7 +145,7 @@ variable "enable_ec2_app" {
 variable "app_instance_type" {
   description = "Type d'instance EC2 pour l'API + frontend."
   type        = string
-  default     = "t3.small"
+  default     = "t2.medium"
 }
 
 variable "app_ingress_cidr_blocks" {
