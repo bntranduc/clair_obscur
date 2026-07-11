@@ -16,7 +16,7 @@ ensure_swap() {
   grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
 }
 
-dnf install -y docker git
+dnf install -y docker git docker-compose-plugin
 systemctl enable --now docker
 usermod -aG docker ec2-user || true
 ensure_swap

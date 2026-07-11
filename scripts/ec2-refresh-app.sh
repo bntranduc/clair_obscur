@@ -30,6 +30,10 @@ if [[ -z "$PUBLIC_IP" ]]; then
   exit 1
 fi
 
+if ! docker compose version >/dev/null 2>&1; then
+  dnf install -y docker-compose-plugin
+fi
+
 export NEXT_PUBLIC_API_BASE="http://${PUBLIC_IP}:8020"
 if [[ -f "$ENV_FILE" ]]; then
   PK="$(grep -E '^DYNAMODB_PK=' "$ENV_FILE" | head -1 | cut -d= -f2- || true)"
