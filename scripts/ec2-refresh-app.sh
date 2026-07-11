@@ -4,6 +4,8 @@ set -euo pipefail
 
 APP_DIR="/opt/clair-obscur"
 ENV_FILE="/etc/clair-obscur/app.env"
+BACKEND_IMAGE="clair-backend-api:latest"
+FRONTEND_IMAGE="clair-frontend:latest"
 
 if ! swapon --show | grep -q /swapfile; then
   if [[ ! -f /swapfile ]]; then
@@ -30,21 +32,38 @@ if [[ -z "$PUBLIC_IP" ]]; then
   exit 1
 fi
 
-if ! docker compose version >/dev/null 2>&1; then
-  dnf install -y docker-compose-plugin
-fi
-
 export NEXT_PUBLIC_API_BASE="http://${PUBLIC_IP}:8020"
+NEXT_PUBLIC_DYNAMODB_PK=""
 if [[ -f "$ENV_FILE" ]]; then
-  PK="$(grep -E '^DYNAMODB_PK=' "$ENV_FILE" | head -1 | cut -d= -f2- || true)"
-  export NEXT_PUBLIC_DYNAMODB_PK="${PK}"
+  NEXT_PUBLIC_DYNAMODB_PK="$(grep -E '^DYNAMODB_PK=' "$ENV_FILE" | head -1 | cut -d= -f2- || true)"
 fi
 
 cd "$APP_DIR"
-docker compose -f docker-compose.prod.yml build
-docker compose -f docker-compose.prod.yml up -d
-docker compose -f docker-compose.prod.yml ps
-curl -sf "http://127.0.0.1:8020/health" | head -c 400
+docker build -f src/api/Dockerfile -t "$BACKEND_IMAGE" .
+docker build -f src/frontend/Dockerfile \
+  --build-arg "NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE}" \
+  --build-arg "NEXT_PUBLIC_DYNAMODB_PK=${NEXT_PUBLIC_DYNAMODB_PK}" \
+  -t "$FRONTEND_IMAGE" \
+  src/frontend
+
+docker stop clair-backend clair-frontend 2>/dev/null || true
+docker rm clair-backend clair-frontend 2>/dev/null || true
+
+docker run -d --name clair-backend \
+  --env-file "$ENV_FILE" \
+  -p 8020:8020 \
+  --restart unless-stopped \
+  "$BACKEND_IMAGE"
+
+docker run -d --name clair-frontend \
+  -p 3000:3000 \
+  --restart unless-stopped \
+  "$FRONTEND_IMAGE"
+
+docker ps --filter name=clair-
+curl -sf "http://127.0.0.1:8020/health"
+echo ""
+curl -sf "http://127.0.0.1:8020/api/v1/alerts" | head -c 200
 echo ""
 echo "Frontend: http://${PUBLIC_IP}:3000"
 echo "API:      http://${PUBLIC_IP}:8020"
