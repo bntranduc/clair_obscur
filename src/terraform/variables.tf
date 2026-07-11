@@ -159,3 +159,21 @@ variable "app_ingress_cidr_blocks" {
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }
+
+variable "enable_ec2_demo_vm" {
+  description = "Créer une EC2 VM démo (capteur logs + attaques factices)."
+  type        = bool
+  default     = true
+}
+
+variable "demo_vm_instance_type" {
+  description = "Type d'instance pour la VM démo capteur."
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "demo_vm_ingress_cidr_blocks" {
+  description = "CIDR autorises sur nginx 8080 (cible attaques)."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}

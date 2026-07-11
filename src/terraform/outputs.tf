@@ -157,6 +157,36 @@ output "app_refresh_command" {
   ) : null
 }
 
+# --- EC2 VM démo (capteur logs) ---
+
+output "demo_vm_instance_id" {
+  description = "ID EC2 VM démo capteur."
+  value       = var.enable_ec2_demo_vm ? aws_instance.demo_vm[0].id : null
+}
+
+output "demo_vm_public_ip" {
+  description = "IP publique VM démo."
+  value       = var.enable_ec2_demo_vm ? aws_instance.demo_vm[0].public_ip : null
+}
+
+output "demo_vm_ssm_command" {
+  description = "Shell SSM sur la VM démo."
+  value = var.enable_ec2_demo_vm ? (
+    var.aws_profile != "" ?
+    "aws ssm start-session --target ${aws_instance.demo_vm[0].id} --region ${var.aws_region} --profile ${var.aws_profile}" :
+    "aws ssm start-session --target ${aws_instance.demo_vm[0].id} --region ${var.aws_region}"
+  ) : null
+}
+
+output "demo_vm_run_attacks_command" {
+  description = "Lance les attaques factices sur la VM démo via SSM."
+  value = var.enable_ec2_demo_vm ? (
+    var.aws_profile != "" ?
+    "aws ssm send-command --instance-ids ${aws_instance.demo_vm[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"clair-run-fake-attacks && python3 /opt/clair-vm-agent/ship_logs.py\"]' --region ${var.aws_region} --profile ${var.aws_profile}" :
+    "aws ssm send-command --instance-ids ${aws_instance.demo_vm[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"clair-run-fake-attacks && python3 /opt/clair-vm-agent/ship_logs.py\"]' --region ${var.aws_region}"
+  ) : null
+}
+
 # --- .env ---
 
 output "env_snippet" {

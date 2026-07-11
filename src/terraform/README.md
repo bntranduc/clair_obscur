@@ -17,6 +17,16 @@ Infrastructure AWS par compte développeur (profil IAM local, clés jamais commi
 
 ## Déployer
 
+**Installation complète (recommandé)** — depuis la racine du dépôt :
+
+```bash
+cp .env.example .env   # credentials + GIT_REPO_URL
+# Activer Bedrock Sonnet dans la console AWS
+./scripts/install.sh
+```
+
+**Terraform seul** (infra + `.env`, sans attendre les EC2) :
+
 ```bash
 cp src/terraform/terraform.tfvars.example src/terraform/terraform.tfvars
 chmod +x scripts/deploy-infra.sh
@@ -33,7 +43,7 @@ src/terraform/
 ├── variables.tf         # Entrées (profil, région, noms…)
 ├── locals.tf            # Account ID, noms auto
 ├── s3.tf                # Buckets logs + prédictions
-├── dynamodb.tf          # Table logs normalisés
+├── dynamodb.tf          # Tables logs normalisés + alertes
 ├── sqs.tf               # File SQS + notification S3 → worker
 ├── outputs.tf           # Outputs + env_snippet
 ├── terraform.tfvars.example
@@ -49,6 +59,7 @@ src/terraform/
 | `s3.tf` | Bucket logs bruts | `RAW_LOGS_BUCKET` | `{project}-{account_id}-raw-logs` |
 | `s3.tf` | Bucket prédictions JSON | `OUTPUT_BUCKET` | `{project}-{account_id}-predictions` |
 | `dynamodb.tf` | Logs normalisés | `DYNAMODB_TABLE` | `{project}-{account_id}-normalized-logs` |
+| `dynamodb.tf` | Alertes | `DYNAMODB_ALERTS_TABLE` | `{project}-{account_id}-alerts` |
 | `sqs.tf` | File prédictions + DLQ | `SQS_QUEUE_URL` | `{project}-{account_id}-predict` |
 
 Notification S3 : tout `.jsonl` / `.gz` créé sous `RAW_LOGS_PREFIX` → SQS → `backend.worker` (Docker sur EC2).
@@ -111,7 +122,18 @@ PYTHONPATH=src python3 -m backend.worker
 
 Test : re-upload un `.jsonl` dans le bucket raw logs → message SQS → JSON dans le bucket predictions.
 
-### Option C — EC2 app (API + frontend)
+### Option C — EC2 VM démo (capteur + attaques factices)
+
+`ec2_demo_vm.tf` : **t3.micro**, agent `vm_setup/`, nginx `:8080`, envoi S3 `vms/*`.
+
+```bash
+terraform output demo_vm_ssm_command
+terraform output -raw demo_vm_run_attacks_command | bash
+```
+
+Voir [`vm_setup/README.md`](../../vm_setup/README.md).
+
+### Option D — EC2 app (API + frontend)
 
 `ec2_app.tf` : **t3.small**, `docker compose -f docker-compose.prod.yml`
 
