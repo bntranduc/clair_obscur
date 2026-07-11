@@ -135,3 +135,21 @@ variable "worker_git_ref" {
   type        = string
   default     = "main"
 }
+
+variable "enable_ec2_app" {
+  description = "Créer l'instance EC2 API + frontend (docker compose prod)."
+  type        = bool
+  default     = true
+}
+
+variable "app_instance_type" {
+  description = "Type d'instance EC2 pour l'API + frontend."
+  type        = string
+  default     = "t3.small"
+}
+
+variable "app_ingress_cidr_blocks" {
+  description = "CIDR autorises sur les ports 8020 et 3000."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}

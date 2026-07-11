@@ -57,7 +57,7 @@ database/
 └── alerts.json   # Catalogue d’alertes
 ```
 
-## Déployer l'infra AWS (S3 + DynamoDB)
+## Déployer l'infra AWS (S3 + DynamoDB + SQS + EC2 worker + EC2 app)
 
 ```bash
 aws configure --profile clair-obscur   # clés IAM
@@ -65,6 +65,9 @@ cp src/terraform/terraform.tfvars.example src/terraform/terraform.tfvars
 chmod +x scripts/deploy-infra.sh
 ./scripts/deploy-infra.sh
 ```
+
+- **Worker** : SQS → Bedrock → S3 predictions (EC2 dédiée)
+- **App** : API `:8020` + frontend `:3000` (`docker-compose.prod.yml`, alertes depuis S3, logs DynamoDB)
 
 Voir `src/terraform/README.md` pour le détail.
 

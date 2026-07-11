@@ -1,3 +1,4 @@
+# Dev local — volumes et logs demo. Prod : docker-compose.prod.yml sur EC2.
 services:
   backend:
     build:

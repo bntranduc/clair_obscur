@@ -86,3 +86,13 @@ done <<< "$SNIPPET"
 echo ""
 echo "==> .env mis à jour ($ENV_FILE)"
 echo "    Infra déployée sur le compte $ACCOUNT."
+
+APP_URL="$(terraform output -raw app_api_url 2>/dev/null || true)"
+FE_URL="$(terraform output -raw app_frontend_url 2>/dev/null || true)"
+if [[ -n "$APP_URL" && "$APP_URL" != "null" ]]; then
+  echo ""
+  echo "==> App EC2 (prod, sans LOCAL_LOGS_DIR) :"
+  echo "    API       $APP_URL"
+  echo "    Frontend  $FE_URL"
+  echo "    Health    ${APP_URL}/health"
+fi

@@ -111,6 +111,37 @@ output "worker_refresh_command" {
   ) : null
 }
 
+# --- EC2 app (API + frontend) ---
+
+output "app_instance_id" {
+  description = "ID instance EC2 API + frontend."
+  value       = var.enable_ec2_app ? aws_instance.app[0].id : null
+}
+
+output "app_public_ip" {
+  description = "IP publique de l'API + frontend."
+  value       = var.enable_ec2_app ? aws_instance.app[0].public_ip : null
+}
+
+output "app_api_url" {
+  description = "URL FastAPI (port 8020)."
+  value       = var.enable_ec2_app ? "http://${aws_instance.app[0].public_ip}:8020" : null
+}
+
+output "app_frontend_url" {
+  description = "URL dashboard Next.js (port 3000)."
+  value       = var.enable_ec2_app ? "http://${aws_instance.app[0].public_ip}:3000" : null
+}
+
+output "app_refresh_command" {
+  description = "Met a jour l'app EC2 apres git push."
+  value = var.enable_ec2_app ? (
+    var.aws_profile != "" ?
+    "aws ssm send-command --instance-ids ${aws_instance.app[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git pull && bash scripts/ec2-refresh-app.sh\"]' --region ${var.aws_region} --profile ${var.aws_profile}" :
+    "aws ssm send-command --instance-ids ${aws_instance.app[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git pull && bash scripts/ec2-refresh-app.sh\"]' --region ${var.aws_region}"
+  ) : null
+}
+
 # --- .env ---
 
 output "env_snippet" {

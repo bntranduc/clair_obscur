@@ -26,9 +26,15 @@ def alerts_json_path() -> Path:
 
 def load_all_alerts() -> dict[str, Any]:
     """
-    Retourne ``{ "alerts": [...], "count": n }`` à partir du JSON (clé ``alerts`` en tête de fichier).
-    Lève ``FileNotFoundError`` / ``ValueError`` si le fichier est absent ou invalide.
+    Retourne ``{ "alerts": [...], "count": n }``.
+    ``ALERTS_SOURCE=s3`` → bucket prédictions ; sinon fichier JSON local.
     """
+    source = (os.getenv("ALERTS_SOURCE") or "file").strip().lower()
+    if source == "s3":
+        from backend.alerts.s3_predictions import load_alerts_from_predictions_bucket
+
+        return load_alerts_from_predictions_bucket()
+
     path = alerts_json_path()
     if not path.is_file():
         raise FileNotFoundError(f"Fichier d'alertes introuvable : {path}")

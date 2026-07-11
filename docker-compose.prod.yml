@@ -1,0 +1,27 @@
+# Production EC2 — pas de volumes locaux, pas de LOCAL_LOGS_DIR.
+# Build : NEXT_PUBLIC_API_BASE=http://<ip-publique>:8020 docker compose -f docker-compose.prod.yml build
+# Run   : docker compose -f docker-compose.prod.yml up -d
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: src/api/Dockerfile
+    ports:
+      - "8020:8020"
+    env_file:
+      - /etc/clair-obscur/app.env
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: src/frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:?set NEXT_PUBLIC_API_BASE e.g. http://1.2.3.4:8020}
+        NEXT_PUBLIC_DYNAMODB_PK: ${NEXT_PUBLIC_DYNAMODB_PK:-}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped

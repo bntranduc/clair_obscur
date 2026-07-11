@@ -88,10 +88,14 @@ def root() -> dict[str, str]:
 @app.get("/health")
 def health() -> dict[str, Any]:
     local = resolve_local_logs_dir()
+    alerts_source = (os.getenv("ALERTS_SOURCE") or "file").strip().lower()
     return {
         "ok": True,
-        "alerts_path": str(alerts_json_path()),
+        "alerts_source": alerts_source,
+        "alerts_path": str(alerts_json_path()) if alerts_source == "file" else None,
+        "predictions_bucket": (os.getenv("PREDICTIONS_BUCKET") or os.getenv("OUTPUT_BUCKET") or "").strip() or None,
         "local_logs_dir": str(local) if local else None,
+        "dynamodb_table": (os.getenv("DYNAMODB_TABLE") or "").strip() or None,
     }
 
 

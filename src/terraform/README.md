@@ -111,6 +111,19 @@ PYTHONPATH=src python3 -m backend.worker
 
 Test : re-upload un `.jsonl` dans le bucket raw logs → message SQS → JSON dans le bucket predictions.
 
+### Option C — EC2 app (API + frontend)
+
+`ec2_app.tf` : **t3.small**, `docker compose -f docker-compose.prod.yml`
+
+- Pas de `LOCAL_LOGS_DIR` — logs via DynamoDB, alertes via `ALERTS_SOURCE=s3`
+- Ports **8020** (API) et **3000** (dashboard) ouverts (CIDR configurable)
+
+```bash
+terraform output app_api_url
+terraform output app_frontend_url
+terraform output -raw app_refresh_command | bash   # apres git push
+```
+
 ## Prochaines briques
 
 - IAM rôles affinés (least privilege Bedrock par modèle)
