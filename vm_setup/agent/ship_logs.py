@@ -29,7 +29,10 @@ STATE_DIR = Path(os.getenv("VM_AGENT_STATE_DIR", "/var/lib/clair-vm-agent"))
 NGINX_LOG = Path(os.getenv("VM_NGINX_ACCESS_LOG", "/var/log/nginx/access.log"))
 AUTH_LOG = Path(os.getenv("VM_AUTH_LOG", "/var/log/secure"))
 INTERVAL_SEC = int(os.getenv("VM_SHIP_INTERVAL_SEC", "60"))
-HOSTNAME = os.getenv("VM_ID") or socket.gethostname()
+
+
+def hostname() -> str:
+    return (os.getenv("VM_ID") or "").strip() or socket.gethostname()
 
 
 def load_env_file(path: Path) -> None:
@@ -78,7 +81,7 @@ def tail_file(path: Path, offsets: dict[str, int]) -> list[str]:
 def collect_events(offsets: dict[str, int]) -> list[dict]:
     events: list[dict] = []
     for line in tail_file(NGINX_LOG, offsets):
-        ev = parse_nginx_access_line(line, hostname=HOSTNAME)
+        ev = parse_nginx_access_line(line, hostname=hostname())
         if ev:
             events.append(ev)
     auth_path = AUTH_LOG
@@ -86,7 +89,7 @@ def collect_events(offsets: dict[str, int]) -> list[dict]:
         alt = Path("/var/log/auth.log")
         auth_path = alt if alt.is_file() else auth_path
     for line in tail_file(auth_path, offsets):
-        ev = parse_auth_line(line, hostname=HOSTNAME)
+        ev = parse_auth_line(line, hostname=hostname())
         if ev:
             events.append(ev)
     return events
@@ -95,7 +98,7 @@ def collect_events(offsets: dict[str, int]) -> list[dict]:
 def s3_key(prefix: str) -> str:
     p = prefix.rstrip("/") + "/"
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    safe_host = HOSTNAME.replace("/", "_").replace(" ", "_")
+    safe_host = hostname().replace("/", "_").replace(" ", "_")
     return f"{p}vms/{safe_host}/{safe_host}-{ts}.jsonl"
 
 
