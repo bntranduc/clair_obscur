@@ -31,8 +31,7 @@ from api.agentic_bridge import _repo_root  # noqa: E402
 from api.agentic_router import router as agentic_router  # noqa: E402
 from api.chat_router import router as chat_router  # noqa: E402
 from backend.agentic.config.loader import load_config  # noqa: E402
-from backend.model.bedrock_client import MODEL_ID_DEFAULT
-from backend.model.predict import predict_alerts
+from backend.model.predict import MODEL_ID_DEFAULT, predict_alerts
 
 API_V1 = "/api/v1"
 
@@ -84,10 +83,6 @@ class InlineAwsCredentials(BaseModel):
 
 class PredictRequest(BaseModel):
     events: list[dict[str, Any]] = Field(..., min_length=1)
-    backend: str | None = Field(
-        default=None,
-        description="'api' pour l'Anthropic API directe, 'bedrock' (défaut) ou variable d'env MODEL_BACKEND.",
-    )
     aws_credentials: InlineAwsCredentials | None = Field(
         default=None,
         description="Optionnel : Bedrock avec ces identifiants pour cette requête ; sinon identifiants ambiant (profil / rôle).",

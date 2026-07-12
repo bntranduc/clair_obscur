@@ -32,9 +32,12 @@ Multiple rule_ids that belong to the same attack campaign MUST be merged into a 
 - attack_type=credential_exfiltration: KILL_CHAIN_CRED_DUMP_TO_EXFIL (credential dump followed by exfiltration — impact confirmed). MITRE T1003 → T1041. Severity: critical. Use credential_exfiltration ONLY when credential dumping + exfiltration is the PRIMARY behavior (no prior ssh_brute_force, sql_injection, or other initial access vector in the incidents). If KILL_CHAIN_CRED_DUMP_TO_EXFIL appears alongside ssh_brute_force or other primary vectors, merge it as post-compromise context into that detection instead.
 KILL_CHAIN_* rules (KILL_CHAIN_RECON_TO_EXPLOIT, KILL_CHAIN_PERSISTENCE, KILL_CHAIN_COMPROMISE_AND_COVER, KILL_CHAIN_WEBBRUTEFORCE_TO_EXPLOIT, KILL_CHAIN_WEBSCAN_TO_EXPLOIT) are correlation signals — they confirm other detections but do NOT create additional detections.
 Exception: KILL_CHAIN_LFI_TO_WEBSHELL and KILL_CHAIN_LOG4SHELL_TO_SHELL each represent a confirmed multi-stage attack with impact — they MUST produce a dedicated detection with their respective attack_type.
-WEB_BRUTEFORCE_HTTP, WEB_BRUTEFORCE_HTTP_UA, WEB_BRUTEFORCE_HTTP_SUCCESS, WEB_DIR_BRUTEFORCE, WEB_NIKTO_SCAN, NET_PORT_SCAN, NET_PORT_SCAN_BURST, NET_NMAP_USERAGENT, WEB_IDOR: consolidate these into the most relevant attack_type they lead to (e.g., brute force leading to web_shell → ssh_brute_force or credential_stuffing; scanning + sqli → sql_injection).
+WEB_BRUTEFORCE_HTTP, WEB_BRUTEFORCE_HTTP_UA, WEB_BRUTEFORCE_HTTP_SUCCESS, WEB_DIR_BRUTEFORCE, WEB_NIKTO_SCAN, NET_PORT_SCAN, NET_PORT_SCAN_BURST, NET_NMAP_USERAGENT, WEB_IDOR: consolidate these into the most relevant attack_type they lead to when they are clearly part of the same campaign (e.g., brute force leading to credential_stuffing).
 
-Only emit multiple detections when there are genuinely distinct attack types from different campaigns (e.g., an SSH brute force campaign AND a separate SQL injection campaign).
+MULTI-TYPE BATCH — MANDATORY:
+If the incident list contains rule_ids that belong to different attack_type families (e.g. SQL_INJECTION* and SSRF and DIRECTORY_TRAVERSAL* present together, even from the same source IP in the same time window), you MUST emit one separate detection per attack_type family. Merge only rule_ids within the same family (see mapping above). Do NOT collapse sql_injection, ssrf, directory_traversal, credential_stuffing, etc. into a single "multi-vector" or "multi-attack" detection.
+
+Only skip a separate detection when rule_ids are variants of the same attack_type family from the same campaign.
 
 Return ONLY valid JSON (no markdown, no commentary) with exactly this shape:
 [

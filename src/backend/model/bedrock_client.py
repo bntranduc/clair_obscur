@@ -1,11 +1,11 @@
+"""Bedrock Converse pour le chat (hors pipeline predict)."""
 from __future__ import annotations
 
 import os
 from typing import Any, Optional
 
 from backend.aws.aws_client import AwsClient
-
-MODEL_ID_DEFAULT = "eu.anthropic.claude-sonnet-4-6"
+from backend.model.predict import MODEL_ID_DEFAULT
 
 
 def _aws_client_for_bedrock(
@@ -29,47 +29,6 @@ def _aws_client_for_bedrock(
     return AwsClient(region_name=region, profile_name=prof)
 
 
-def bedrock_converse_text(
-    prompt: str,
-    *,
-    region: str = "eu-west-3",
-    max_tokens: int = 512,
-    model_id: str = MODEL_ID_DEFAULT,
-    profile_name: Optional[str] = None,
-    inline_credentials: Optional[dict[str, str]] = None,
-) -> str:
-    if not prompt or not prompt.strip():
-        raise ValueError("prompt must be a non-empty string")
-
-    if not (model_id or "").strip():
-        model_id = MODEL_ID_DEFAULT
-
-    client = _aws_client_for_bedrock(
-        region=region,
-        profile_name=profile_name,
-        inline_credentials=inline_credentials,
-    ).bedrock_runtime()
-
-    resp = client.converse(
-        modelId=model_id,
-        messages=[
-            {
-                "role": "user",
-                "content": [{"text": prompt.strip()}],
-            }
-        ],
-        inferenceConfig={"maxTokens": int(max_tokens)},
-    )
-
-    parts = resp.get("output", {}).get("message", {}).get("content", [])
-    texts: list[str] = []
-    if isinstance(parts, list):
-        for p in parts:
-            if isinstance(p, dict) and isinstance(p.get("text"), str):
-                texts.append(p["text"])
-    return "".join(texts).strip()
-
-
 def bedrock_converse_chat(
     messages: list[dict[str, str]],
     *,
@@ -80,7 +39,6 @@ def bedrock_converse_chat(
     inline_credentials: Optional[dict[str, str]] = None,
     system_prompt: Optional[str] = None,
 ) -> str:
-    """Conversation multi-tours (rôles ``user`` / ``assistant``) via l’API Converse."""
     if not messages:
         raise ValueError("messages must be non-empty")
 
@@ -96,9 +54,7 @@ def bedrock_converse_chat(
         text = (m.get("content") or "").strip()
         if role not in ("user", "assistant") or not text:
             continue
-        converse_messages.append(
-            {"role": role, "content": [{"text": text}]},
-        )
+        converse_messages.append({"role": role, "content": [{"text": text}]})
     if not converse_messages:
         raise ValueError("no valid user/assistant messages")
 

@@ -12,10 +12,7 @@ Le fichier peut être :
   - Gzip des formats ci-dessus (.gz)
 
 Variables d'environnement optionnelles :
-  MODEL_BACKEND         'api' ou 'bedrock' (défaut : bedrock)
-  ANTHROPIC_API_KEY     Clé API Anthropic (backend=api)
-  ANTHROPIC_MODEL_ID    Modèle Anthropic direct (défaut : claude-opus-4-6)
-  BEDROCK_MODEL_ID      ID du modèle Bedrock (défaut : eu.anthropic.claude-opus-4-6-v1)
+  BEDROCK_MODEL_ID      ID du modèle Bedrock (défaut : predict.MODEL_ID_DEFAULT)
   AWS_REGION            Région AWS (défaut : eu-west-3)
   AWS_ACCESS_KEY_ID     Credentials AWS
   AWS_SECRET_ACCESS_KEY Credentials AWS
@@ -48,12 +45,7 @@ except ImportError:
     pass
 
 from backend.log.normalization.normalize import normalize  # noqa: E402
-from backend.model.api_client import API_MODEL_ID_DEFAULT  # noqa: E402
-from backend.model.bedrock_client import MODEL_ID_DEFAULT  # noqa: E402
-from backend.model.incident_llm import (  # noqa: E402
-    DEFAULT_ALLOWED_ATTACK_TYPES,
-    predict_submission_from_incidents,
-)
+from backend.model.predict import MODEL_ID_DEFAULT, predict_from_incidents  # noqa: E402
 from backend.model.rules.aggregate_signals import aggregate_signals  # noqa: E402
 from backend.model.rules.rules_window import detect_signals_window_1h  # noqa: E402
 
@@ -131,36 +123,28 @@ def _dump(obj: Any) -> str:
 def _call_llm_with_retry(
     incidents: list[Any],
     *,
-    backend: str,
     model_id: str,
     region: str,
     max_tokens: int,
-    api_key: str | None,
-    api_model_id: str,
     emit,
     max_attempts: int = 6,
     base_delay: float = 10.0,
-) -> Any:
+) -> list[dict[str, Any]]:
     creds: dict[str, str] = {}
-    if backend == "bedrock":
-        if os.getenv("AWS_ACCESS_KEY_ID"):
-            creds["aws_access_key_id"] = os.getenv("AWS_ACCESS_KEY_ID")  # type: ignore[assignment]
-        if os.getenv("AWS_SECRET_ACCESS_KEY"):
-            creds["aws_secret_access_key"] = os.getenv("AWS_SECRET_ACCESS_KEY")  # type: ignore[assignment]
-        if os.getenv("AWS_SESSION_TOKEN"):
-            creds["aws_session_token"] = os.getenv("AWS_SESSION_TOKEN")  # type: ignore[assignment]
+    if os.getenv("AWS_ACCESS_KEY_ID"):
+        creds["aws_access_key_id"] = os.getenv("AWS_ACCESS_KEY_ID")  # type: ignore[assignment]
+    if os.getenv("AWS_SECRET_ACCESS_KEY"):
+        creds["aws_secret_access_key"] = os.getenv("AWS_SECRET_ACCESS_KEY")  # type: ignore[assignment]
+    if os.getenv("AWS_SESSION_TOKEN"):
+        creds["aws_session_token"] = os.getenv("AWS_SESSION_TOKEN")  # type: ignore[assignment]
     for attempt in range(1, max_attempts + 1):
         try:
-            return predict_submission_from_incidents(
+            return predict_from_incidents(
                 incidents,
-                backend=backend,  # type: ignore[arg-type]
-                allowed_attack_types=DEFAULT_ALLOWED_ATTACK_TYPES,
                 region=region,
                 model_id=model_id,
                 max_tokens=max_tokens,
                 inline_aws_credentials=creds or None,
-                api_key=api_key,
-                api_model_id=api_model_id,
             )
         except Exception as e:
             if "ThrottlingException" not in type(e).__name__ and "ThrottlingException" not in str(e):
@@ -170,6 +154,7 @@ def _call_llm_with_retry(
             delay = base_delay * (2 ** (attempt - 1))
             emit(f"      Throttling (tentative {attempt}/{max_attempts}) — attente {delay:.0f}s ...")
             time.sleep(delay)
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -180,12 +165,9 @@ def run(
     log_file: Path,
     *,
     limit: int | None,
-    backend: str,
     model_id: str,
     region: str,
     max_tokens: int,
-    api_key: str | None,
-    api_model_id: str,
     output_file: Path | None,
 ) -> None:
     out = open(output_file, "w", encoding="utf-8") if output_file else sys.stdout
@@ -230,17 +212,14 @@ def run(
             emit(_dump(incidents))
 
         # 4. Prédiction LLM obligatoire (retry sur ThrottlingException)
-        llm_label = f"api/{api_model_id}" if backend == "api" else f"bedrock/{model_id} region={region}"
+        llm_label = f"bedrock/{model_id} region={region}"
         emit(f"\n[4/4] Envoi au LLM ({llm_label}) ...")
         t4 = time.perf_counter()
         pred = _call_llm_with_retry(
             incidents,
-            backend=backend,
             model_id=model_id,
             region=region,
             max_tokens=max_tokens,
-            api_key=api_key,
-            api_model_id=api_model_id,
             emit=emit,
         )
         t5 = time.perf_counter()
@@ -311,13 +290,6 @@ def _parse_args() -> argparse.Namespace:
         help="Nombre max d'événements à charger (défaut : tous)",
     )
     p.add_argument(
-        "--backend",
-        default=os.getenv("MODEL_BACKEND", "bedrock"),
-        choices=["bedrock", "api"],
-        help="Backend LLM : 'bedrock' (défaut) ou 'api' (Anthropic API directe)",
-    )
-    # --- Bedrock ---
-    p.add_argument(
         "--model-id",
         default=os.getenv("BEDROCK_MODEL_ID", MODEL_ID_DEFAULT),
         help=f"ID du modèle Bedrock (défaut : {MODEL_ID_DEFAULT})",
@@ -326,17 +298,6 @@ def _parse_args() -> argparse.Namespace:
         "--region",
         default=os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "eu-west-3")),
         help="Région AWS Bedrock (défaut : eu-west-3)",
-    )
-    # --- Anthropic API directe ---
-    p.add_argument(
-        "--api-key",
-        default=os.getenv("ANTHROPIC_API_KEY"),
-        help="Clé API Anthropic (backend=api ; défaut : $ANTHROPIC_API_KEY)",
-    )
-    p.add_argument(
-        "--api-model-id",
-        default=os.getenv("ANTHROPIC_MODEL_ID", API_MODEL_ID_DEFAULT),
-        help=f"Modèle Anthropic direct (défaut : {API_MODEL_ID_DEFAULT})",
     )
     p.add_argument(
         "--max-tokens",
@@ -364,11 +325,8 @@ if __name__ == "__main__":
     run(
         args.log_file,
         limit=args.limit,
-        backend=args.backend,
         model_id=args.model_id,
         region=args.region,
         max_tokens=args.max_tokens,
-        api_key=args.api_key,
-        api_model_id=args.api_model_id,
         output_file=args.output,
     )

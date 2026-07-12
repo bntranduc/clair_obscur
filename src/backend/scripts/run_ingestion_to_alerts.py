@@ -8,10 +8,8 @@ Usage :
 
 Variables d'environnement :
   LOCAL_LOGS_DIR        Répertoire d'ingestion (priorité sur --ingestion-dir)
-  ANTHROPIC_API_KEY     Clé API Anthropic (backend=api)
-  ANTHROPIC_MODEL_ID    Modèle direct (défaut : claude-sonnet-4-6)
-  BEDROCK_MODEL_ID      Modèle Bedrock (défaut : eu.anthropic.claude-opus-4-6-v1)
-  MODEL_BACKEND         'api' ou 'bedrock' (défaut : api si ANTHROPIC_API_KEY présent, sinon bedrock)
+  BEDROCK_MODEL_ID      Modèle Bedrock (défaut : predict.MODEL_ID_DEFAULT)
+  AWS_REGION            Région Bedrock (défaut : eu-west-3)
 """
 from __future__ import annotations
 
@@ -39,13 +37,11 @@ except ImportError:
 from backend.log.normalization.normalize import normalize  # noqa: E402
 from backend.model.rules.aggregate_signals import aggregate_signals  # noqa: E402
 from backend.model.rules.rules_window import detect_signals_window_1h  # noqa: E402
-from backend.model.incident_llm import (  # noqa: E402
-    DEFAULT_ALLOWED_ATTACK_TYPES,
+from backend.model.predict import (  # noqa: E402
     DEFAULT_DETECTION_TIME_SECONDS,
-    predict_submission_from_incidents,
+    MODEL_ID_DEFAULT,
+    predict_from_incidents,
 )
-from backend.model.api_client import API_MODEL_ID_DEFAULT  # noqa: E402
-from backend.model.bedrock_client import MODEL_ID_DEFAULT  # noqa: E402
 from backend.alerts.store import alerts_json_path  # noqa: E402
 
 
@@ -101,31 +97,22 @@ def _to_alert_record(pred: dict[str, Any], numeric_id: int) -> dict[str, Any]:
     return record
 
 
-def _call_llm(incidents: list[Any], *, backend: str, model_id: str, api_model_id: str,
-               region: str, api_key: str | None) -> list[dict[str, Any]]:
+def _call_llm(incidents: list[Any], *, model_id: str, region: str) -> list[dict[str, Any]]:
     creds: dict[str, str] = {}
-    if backend == "bedrock":
-        for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"):
-            v = os.getenv(k)
-            if v:
-                creds[k.lower()] = v
+    for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"):
+        v = os.getenv(k)
+        if v:
+            creds[k.lower()] = v
 
     try:
-        pred = predict_submission_from_incidents(
+        return predict_from_incidents(
             incidents,
-            backend=backend,  # type: ignore[arg-type]
-            allowed_attack_types=DEFAULT_ALLOWED_ATTACK_TYPES,
             region=region,
             model_id=model_id,
-            api_key=api_key,
-            api_model_id=api_model_id,
             inline_aws_credentials=creds or None,
         )
     except Exception as exc:
         raise RuntimeError("LLM prediction failed") from exc
-
-    rows = pred if isinstance(pred, list) else ([pred] if pred else [])
-    return [r for r in rows if isinstance(r, dict)]
 
 
 # ---------------------------------------------------------------------------
@@ -164,20 +151,12 @@ def main() -> None:
     incidents = aggregate_signals(all_signals)
     print(f"      {len(incidents)} incident(s) agrégé(s)\n")
 
-    backend = (os.getenv("MODEL_BACKEND") or "bedrock").strip()
-    api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip() or None
-    if backend == "api" and not api_key:
-        raise SystemExit("MODEL_BACKEND=api requires ANTHROPIC_API_KEY")
-
     model_id = (os.getenv("BEDROCK_MODEL_ID") or MODEL_ID_DEFAULT).strip()
-    api_model_id = (os.getenv("ANTHROPIC_MODEL_ID") or API_MODEL_ID_DEFAULT).strip()
     region = (os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "eu-west-3").strip()
 
-    label = f"api/{api_model_id}" if backend == "api" else f"bedrock/{model_id}"
-    print(f"[3/3] Appel LLM obligatoire ({label}) ...")
+    print(f"[3/3] Appel Bedrock ({model_id}) ...")
     t3 = time.perf_counter()
-    raw_preds = _call_llm(incidents, backend=backend, model_id=model_id,
-                          api_model_id=api_model_id, region=region, api_key=api_key)
+    raw_preds = _call_llm(incidents, model_id=model_id, region=region)
     print(f"      {len(raw_preds)} prédiction(s) reçues en {time.perf_counter()-t3:.1f}s")
     alerts = [_to_alert_record(p, i + 1) for i, p in enumerate(raw_preds)]
 

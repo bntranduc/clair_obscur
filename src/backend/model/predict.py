@@ -1,52 +1,178 @@
+"""Pipeline prédiction : règles → agrégation → Bedrock → alertes JSON."""
 from __future__ import annotations
 
+import json
 import os
-from typing import Any, Literal, Sequence
+import re
+from pathlib import Path
+from typing import Any, Iterable, Mapping, Sequence
 
+from backend.aws.aws_client import AwsClient
 from backend.log.normalization.types import NormalizedEvent
-from backend.model.api_client import API_MODEL_ID_DEFAULT
-from backend.model.bedrock_client import MODEL_ID_DEFAULT
-from backend.model.incident_llm import DEFAULT_ALLOWED_ATTACK_TYPES, predict_submission_from_incidents
+from backend.model.prompt.prompt import PREDICTION_PROMPT_TEMPLATE
 from backend.model.rules.aggregate_signals import aggregate_signals
 from backend.model.rules.rules_window import detect_signals_window_1h
 
-# rule_id → attack_type pour séparer les alertes en mode démo VM
-_RULE_ATTACK_TYPE: dict[str, str] = {
-    "SQL_INJECTION": "sql_injection",
-    "SQL_INJECTION_SQLMAP_UA": "sql_injection",
-    "SQL_INJECTION_MANY_500": "sql_injection",
-    "SQL_INJECTION_EXFIL": "sql_injection",
-    "WEB_SQLI_AUTOMATED": "sql_injection",
-    "SSRF": "ssrf",
-    "DIRECTORY_TRAVERSAL": "directory_traversal",
-    "DIRECTORY_TRAVERSAL_SUCCESS": "directory_traversal",
-    "WEB_SENSITIVE_FILE_ACCESS": "directory_traversal",
-    "WEB_LFI_RFI": "lfi_rfi",
-    "SSH_BRUTEFORCE": "ssh_brute_force",
-    "SSH_BRUTEFORCE_SSH_ONLY": "ssh_brute_force",
-    "SSH_PRIV_ESC": "ssh_brute_force",
-    "CREDENTIAL_STUFFING": "credential_stuffing",
-    "WEB_BRUTEFORCE_HTTP": "credential_stuffing",
-    "WEB_BRUTEFORCE_HTTP_UA": "credential_stuffing",
-}
+MODEL_ID_DEFAULT = "eu.anthropic.claude-sonnet-4-6"
+
+DEFAULT_ALLOWED_ATTACK_TYPES: tuple[str, ...] = (
+    "ssh_brute_force",
+    "credential_stuffing",
+    "sql_injection",
+    "directory_traversal",
+    "ssrf",
+    "exfiltration",
+    "reconnaissance",
+    "lfi_rfi",
+    "credential_dumping",
+    "log4shell",
+    "sensitive_file_disclosure",
+    "lfi_to_rce",
+    "log4shell_rce",
+    "credential_exfiltration",
+)
+
+SEVERITY_LEVELS_SIEM: tuple[str, ...] = ("low", "medium", "high", "critical")
+DEFAULT_DETECTION_TIME_SECONDS = 300
+
+_PROMPT_DIR = Path(__file__).resolve().parent / "prompt"
 
 
-def _demo_mode_enabled() -> bool:
-    return (os.getenv("RULES_DEMO_MODE") or "").strip().lower() in ("1", "true", "yes", "on")
+def _aws_client(
+    *,
+    region: str,
+    profile_name: str | None = None,
+    inline_credentials: dict[str, str] | None = None,
+) -> AwsClient:
+    if inline_credentials:
+        ak = (inline_credentials.get("aws_access_key_id") or "").strip()
+        sk = (inline_credentials.get("aws_secret_access_key") or "").strip()
+        if not ak or not sk:
+            raise ValueError("inline_credentials requires aws_access_key_id and aws_secret_access_key")
+        creds: dict[str, str] = {"aws_access_key_id": ak, "aws_secret_access_key": sk}
+        st = (inline_credentials.get("aws_session_token") or "").strip()
+        if st:
+            creds["aws_session_token"] = st
+        return AwsClient(region_name=region, credentials=creds)
+    prof = profile_name if profile_name is not None else os.getenv("AWS_PROFILE")
+    prof = (prof or "").strip() or None
+    return AwsClient(region_name=region, profile_name=prof)
 
 
-def _bucket_incidents_for_demo(incidents: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-    buckets: dict[str, list[dict[str, Any]]] = {}
-    for inc in incidents:
-        rule = str(inc.get("rule_id") or "")
-        attack_type = _RULE_ATTACK_TYPE.get(rule)
-        if not attack_type:
+def _bedrock_text(
+    prompt: str,
+    *,
+    region: str,
+    model_id: str,
+    max_tokens: int,
+    profile_name: str | None,
+    inline_credentials: dict[str, str] | None,
+) -> str:
+    if not prompt.strip():
+        raise ValueError("prompt must be a non-empty string")
+    client = _aws_client(
+        region=region,
+        profile_name=profile_name,
+        inline_credentials=inline_credentials,
+    ).bedrock_runtime()
+    resp = client.converse(
+        modelId=(model_id or MODEL_ID_DEFAULT).strip(),
+        messages=[{"role": "user", "content": [{"text": prompt.strip()}]}],
+        inferenceConfig={"maxTokens": int(max_tokens)},
+    )
+    parts = resp.get("output", {}).get("message", {}).get("content", [])
+    texts: list[str] = []
+    if isinstance(parts, list):
+        for p in parts:
+            if isinstance(p, dict) and isinstance(p.get("text"), str):
+                texts.append(p["text"])
+    return "".join(texts).strip()
+
+
+def _format_embedded_prediction_examples() -> str:
+    p1 = _PROMPT_DIR / "expected_predictions_example.json"
+    p2 = _PROMPT_DIR / "expected_predictions_second_type_example.json"
+    ex1 = json.loads(p1.read_text(encoding="utf-8"))
+    ex2 = json.loads(p2.read_text(encoding="utf-8"))
+    s1 = json.dumps(ex1, ensure_ascii=False, indent=2)
+    s2 = json.dumps(ex2, ensure_ascii=False, indent=2)
+    return f"""Example 1 — full object shape (fictional values; attack_type ssh_brute_force):
+{s1}
+
+Example 2 — same shape, different attack_type (credential_stuffing, fictional):
+{s2}"""
+
+
+def _slice_balanced_json(text: str, start: int, open_ch: str, close_ch: str) -> str | None:
+    if start < 0 or start >= len(text) or text[start] != open_ch:
+        return None
+    depth = 0
+    i = start
+    n = len(text)
+    in_str = False
+    esc = False
+    while i < n:
+        c = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            i += 1
             continue
-        buckets.setdefault(attack_type, []).append(inc)
-    return buckets
+        if c == '"':
+            in_str = True
+            i += 1
+            continue
+        if c == open_ch:
+            depth += 1
+        elif c == close_ch:
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+        i += 1
+    return None
 
 
-def _normalize_llm_output(out: Any) -> list[dict[str, Any]]:
+def _extract_json_value(text: str) -> Any:
+    t = text.strip()
+    fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", t, re.IGNORECASE)
+    if fence:
+        t = fence.group(1).strip()
+
+    arr_start = t.find("[")
+    obj_start = t.find("{")
+    if arr_start != -1 and (obj_start == -1 or arr_start < obj_start):
+        blob = _slice_balanced_json(t, arr_start, "[", "]")
+        if blob:
+            return json.loads(blob)
+    if obj_start != -1:
+        blob = _slice_balanced_json(t, obj_start, "{", "}")
+        if blob:
+            return json.loads(blob)
+    raise ValueError("Model response did not contain a parseable JSON value")
+
+
+def build_prediction_prompt(
+    *,
+    aggregated_incidents: Sequence[Mapping[str, Any]],
+    allowed_attack_types: Iterable[str],
+    detection_time_seconds: int = DEFAULT_DETECTION_TIME_SECONDS,
+) -> str:
+    types_list = "\n".join(f"- {x}" for x in allowed_attack_types)
+    incidents_blob = json.dumps(list(aggregated_incidents), ensure_ascii=False, indent=2)
+    examples_blob = _format_embedded_prediction_examples()
+    return PREDICTION_PROMPT_TEMPLATE.format(
+        types_list=types_list,
+        detection_time_seconds=detection_time_seconds,
+        examples_blob=examples_blob,
+        incidents_blob=incidents_blob,
+    )
+
+
+def _normalize_alerts(out: Any) -> list[dict[str, Any]]:
     if isinstance(out, list):
         return [x for x in out if isinstance(x, dict)]
     if isinstance(out, dict):
@@ -54,85 +180,54 @@ def _normalize_llm_output(out: Any) -> list[dict[str, Any]]:
     raise RuntimeError(f"LLM returned unexpected type: {type(out).__name__}")
 
 
-def _call_llm(
-    incidents: list[dict[str, Any]],
+def predict_from_incidents(
+    aggregated_incidents: Sequence[Mapping[str, Any]],
     *,
-    backend: Literal["bedrock", "api"],
-    region: str,
-    model_id: str | None,
-    max_tokens: int,
-    profile_name: str | None,
-    inline_aws_credentials: dict[str, str] | None,
-    api_key: str | None,
-    api_model_id: str,
+    allowed_attack_types: Sequence[str] | None = None,
+    detection_time_seconds: int = DEFAULT_DETECTION_TIME_SECONDS,
+    region: str = "eu-west-3",
+    model_id: str = MODEL_ID_DEFAULT,
+    max_tokens: int = 4096,
+    profile_name: str | None = None,
+    inline_aws_credentials: Mapping[str, str] | None = None,
 ) -> list[dict[str, Any]]:
-    out = predict_submission_from_incidents(
-        incidents,
-        backend=backend,
-        allowed_attack_types=DEFAULT_ALLOWED_ATTACK_TYPES,
+    """Appelle Bedrock sur des incidents déjà agrégés."""
+    allowed = tuple(allowed_attack_types or DEFAULT_ALLOWED_ATTACK_TYPES)
+    prompt = build_prediction_prompt(
+        aggregated_incidents=aggregated_incidents,
+        allowed_attack_types=allowed,
+        detection_time_seconds=detection_time_seconds,
+    )
+    raw = _bedrock_text(
+        prompt,
         region=region,
-        model_id=model_id or MODEL_ID_DEFAULT,
+        model_id=model_id,
         max_tokens=max_tokens,
         profile_name=profile_name,
-        inline_aws_credentials=inline_aws_credentials,
-        api_key=api_key,
-        api_model_id=api_model_id,
+        inline_credentials=dict(inline_aws_credentials) if inline_aws_credentials else None,
     )
-    return _normalize_llm_output(out)
-
-
-def _rules_kwargs_from_env() -> dict[str, Any]:
-    """Seuils assouplis pour la VM démo / petits batches (curls manuels espacés)."""
-    flag = (os.getenv("RULES_DEMO_MODE") or "").strip().lower()
-    if flag not in ("1", "true", "yes", "on"):
-        return {}
-    return {
-        "sqli_min_hits": 1,
-        "ssrf_min_hits": 1,
-        "traversal_min_hits": 1,
-        "ssh_failures_threshold": 15,
-        "ssh_exclusive_min_failures": 15,
-        "http_bruteforce_threshold": 5,
-        "dir_bruteforce_threshold": 10,
-    }
+    return _normalize_alerts(_extract_json_value(raw))
 
 
 def predict_alerts(
     events: Sequence[NormalizedEvent],
     *,
-    backend: Literal["bedrock", "api"] = "bedrock",
-    # bedrock
     region: str = "eu-west-3",
     model_id: str | None = None,
     max_tokens: int = 4096,
     profile_name: str | None = None,
     inline_aws_credentials: dict[str, str] | None = None,
-    # direct api
-    api_key: str | None = None,
-    api_model_id: str = API_MODEL_ID_DEFAULT,
 ) -> list[dict[str, Any]]:
-    """Règles → agrégation → LLM obligatoire (Bedrock ou API). Aucun repli sans appel modèle."""
-    incidents = aggregate_signals(detect_signals_window_1h(events, **_rules_kwargs_from_env()))
-    llm_kwargs = dict(
-        backend=backend,
-        region=region,
-        model_id=model_id,
-        max_tokens=max_tokens,
-        profile_name=profile_name,
-        inline_aws_credentials=inline_aws_credentials,
-        api_key=api_key,
-        api_model_id=api_model_id,
-    )
+    """Règles → agrégation → Bedrock."""
+    incidents = aggregate_signals(detect_signals_window_1h(events))
     try:
-        # Mode démo : une alerte LLM par type d'attaque (SQLi, SSRF, traversal…) au lieu d'une seule fusionnée.
-        if _demo_mode_enabled():
-            buckets = _bucket_incidents_for_demo(incidents)
-            if len(buckets) >= 2:
-                merged: list[dict[str, Any]] = []
-                for _attack_type, bucket in buckets.items():
-                    merged.extend(_call_llm(bucket, **llm_kwargs))
-                if merged:
-                    return merged
-        return _call_llm(incidents, **llm_kwargs)
+        return predict_from_incidents(
+            incidents,
+            region=region,
+            model_id=(model_id or MODEL_ID_DEFAULT).strip(),
+            max_tokens=max_tokens,
+            profile_name=profile_name,
+            inline_aws_credentials=inline_aws_credentials,
+        )
     except Exception as exc:
         raise RuntimeError("LLM prediction failed") from exc

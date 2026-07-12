@@ -45,7 +45,7 @@ Tu peux aussi mettre `AWS_PROFILE=bao` dans un fichier `.env` à la racine du re
 
 Variables optionnelles pour l’API :
 
-- `BEDROCK_MODEL_ID` — sinon défaut dans `bedrock_client.MODEL_ID_DEFAULT`
+- `BEDROCK_MODEL_ID` — sinon défaut dans `predict.MODEL_ID_DEFAULT`
 - `BEDROCK_MAX_TOKENS` — défaut `4096`
 
 Voir `.env.example` à la racine du repo (sans secrets statiques).
@@ -64,30 +64,6 @@ Ou depuis n’importe où sous la racine du repo :
 ./src/backend/scripts/run_model_serve.sh
 ```
 
-**API minimale** (Bedrock uniquement, identifiants dans le corps de `POST /predict`) — peu de dépendances, adaptée EC2 :
-
-```bash
-pip install -r src/backend/model/requirements-model-api.txt
-./src/backend/model/run_model_api.sh
-```
-
-Image Docker : `docker build -f src/backend/model/Dockerfile -t clair-model-api .` puis `docker run --rm -p 8080:8080 -e BEDROCK_MODEL_ID=eu.anthropic.claude-opus-4-6-v1 clair-model-api`.
-
-Exemple `POST /predict` (corps JSON — **ne pas** commiter de vraies clés) :
-
-```bash
-curl -sS -X POST http://127.0.0.1:8080/predict -H "Content-Type: application/json" -d @- <<'EOF'
-{
-  "events": [{"timestamp":"2026-01-15T08:00:01Z","log_source":"authentication","source_ip":"203.0.113.50","auth_method":"ssh","status":"failure","username":"root"}],
-  "aws_access_key_id": "AKIA...",
-  "aws_secret_access_key": "...",
-  "aws_session_token": "IQoJb3...",
-  "region": "eu-west-3"
-}
-EOF
-```
-
-(Si `uvicorn` est introuvable : utilise toujours `python3 -m uvicorn` après `pip install -r …`.)
 
 ### 4. Sécurité groupe (Security Group)
 
@@ -125,21 +101,18 @@ EOF
 
 Documentation interactive : `http://VOTRE_IP_PUBLIQUE:8080/docs`
 
-Chaque élément de `alerts` inclut `challenge_id`, **`severity`** (`low` \| `medium` \| `high` \| `critical`), **`alert_summary`** (résumé court), `detection`, `detection_time_seconds`, **`confidence`**, **`reasons`**, **`exhaustive_analysis`**, **`remediation_proposal`** (actions opérationnelles proposées). Constante `SEVERITY_LEVELS_SIEM` dans `incident_llm`. Voir `incident_llm.build_prediction_prompt`.
+Chaque élément de `alerts` inclut `challenge_id`, **`severity`** (`low` \| `medium` \| `high` \| `critical`), **`alert_summary`** (résumé court), `detection`, `detection_time_seconds`, **`confidence`**, **`reasons`**, **`exhaustive_analysis`**, **`remediation_proposal`**. Voir `predict.build_prediction_prompt`.
 
 ## Fichiers utiles
 
 | Fichier | Rôle |
 |--------|------|
-| `prompt/expected_predictions_example.json` | Exemple embarqué (ssh_brute_force) injecté dans le prompt Bedrock |
-| `prompt/expected_predictions_second_type_example.json` | Deuxième exemple (credential_stuffing) |
-| `src/api/model_app.py` | FastAPI complète : `/predict` (Bedrock ; `aws_credentials` optionnel dans le corps), chat, agentic, SIEM |
-| `model_api.py` | **API minimale EC2** : `/health`, `/predict` uniquement — Bedrock avec identifiants AWS dans le corps de la requête |
-| `Dockerfile` | Image légère : `docker build -f src/backend/model/Dockerfile -t clair-model-api .` (contexte = racine du repo) |
-| `requirements-model-api.txt` | Dépendances pour `model_api` / image Docker |
-| `run_model_api.sh` | Lance `uvicorn backend.model.model_api:app` en local (`HOST`, `PORT`) |
-| `predict.py` | `predict_alerts` → Bedrock (`inline_aws_credentials` ou profil / rôle ; voir `incident_llm`) |
+| `predict.py` | Pipeline complet : règles → agrégation → Bedrock → alertes (`predict_alerts`, `predict_from_incidents`) |
+| `bedrock_client.py` | Chat multi-tours (`bedrock_converse_chat`) pour l’API conversationnelle |
+| `prompt/` | Template prompt + exemples JSON embarqués |
+| `rules/` | Détection déterministe (fenêtre 1h) et agrégation |
+| `src/api/model_app.py` | FastAPI : `/predict`, chat, agentic, SIEM |
 | `../scripts/run_model_serve.sh` | Lance `api.model_app:app` avec `PYTHONPATH` correct |
-| `../worker/` | Worker SQS → S3 logs → prédictions → S3 JSON (Docker) |
+| `../worker/` | Worker SQS → S3 logs → prédictions inline → DynamoDB + S3 |
 
 Le modèle `.env` versionné est à la racine du repo : `.env.example`.

@@ -1,5 +1,5 @@
 """
-Lambda : événement SQS (notification S3) → lecture JSONL/gzip → POST /predict (model_api)
+Lambda : événement SQS (notification S3) → lecture JSONL/gzip → POST /predict
 → écriture JSON dans OUTPUT_BUCKET.
 
 Variables d'environnement :
