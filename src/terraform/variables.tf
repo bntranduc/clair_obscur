@@ -187,7 +187,7 @@ variable "demo_vm_ingress_cidr_blocks" {
 variable "enable_ec2_fresh_vm" {
   description = "EC2 VM fraîche pour tester vm_setup/connect.sh (sans agent préinstallé)."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "fresh_vm_instance_type" {

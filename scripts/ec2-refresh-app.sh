@@ -106,9 +106,9 @@ echo ""
 if docker ps --format '{{.Names}}' | grep -q '^clair-log-explain$'; then
   curl -sf "http://127.0.0.1:8001/health" && echo ""
 fi
-curl -sf "http://127.0.0.1:8020/api/v1/agentic/models" | head -c 300
+curl -sf "http://127.0.0.1:8020/api/v1/agentic/models" | head -c 300 || true
 echo ""
-curl -sf "http://127.0.0.1:8020/api/v1/alerts" | head -c 200
+curl -sf "http://127.0.0.1:8020/api/v1/alerts" | head -c 200 || true
 echo ""
 echo "Frontend: http://${PUBLIC_IP}:3000"
 echo "API:      http://${PUBLIC_IP}:8020"

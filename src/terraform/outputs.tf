@@ -131,8 +131,8 @@ output "worker_refresh_command" {
   description = "Met a jour le worker sur l'EC2 : git pull + rebuild Docker (via SSM)."
   value = var.enable_ec2_worker ? (
     var.aws_profile != "" ?
-    "aws ssm send-command --instance-ids ${aws_instance.predict_worker[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git pull && bash scripts/ec2-refresh-worker.sh\"]' --region ${var.aws_region} --profile ${var.aws_profile}" :
-    "aws ssm send-command --instance-ids ${aws_instance.predict_worker[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git pull && bash scripts/ec2-refresh-worker.sh\"]' --region ${var.aws_region}"
+    "aws ssm send-command --instance-ids ${aws_instance.predict_worker[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git fetch origin && git reset --hard origin/${var.worker_git_ref} && bash scripts/ec2-refresh-worker.sh\"]' --region ${var.aws_region} --profile ${var.aws_profile}" :
+    "aws ssm send-command --instance-ids ${aws_instance.predict_worker[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git fetch origin && git reset --hard origin/${var.worker_git_ref} && bash scripts/ec2-refresh-worker.sh\"]' --region ${var.aws_region}"
   ) : null
 }
 
@@ -162,8 +162,8 @@ output "app_refresh_command" {
   description = "Met a jour l'app EC2 apres git push."
   value = var.enable_ec2_app ? (
     var.aws_profile != "" ?
-    "aws ssm send-command --instance-ids ${aws_instance.app[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git pull && bash scripts/ec2-refresh-app.sh\"]' --region ${var.aws_region} --profile ${var.aws_profile}" :
-    "aws ssm send-command --instance-ids ${aws_instance.app[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git pull && bash scripts/ec2-refresh-app.sh\"]' --region ${var.aws_region}"
+    "aws ssm send-command --instance-ids ${aws_instance.app[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git fetch origin && git reset --hard origin/${var.worker_git_ref} && bash scripts/ec2-refresh-app.sh\"]' --region ${var.aws_region} --profile ${var.aws_profile}" :
+    "aws ssm send-command --instance-ids ${aws_instance.app[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git fetch origin && git reset --hard origin/${var.worker_git_ref} && bash scripts/ec2-refresh-app.sh\"]' --region ${var.aws_region}"
   ) : null
 }
 
@@ -234,6 +234,25 @@ output "fresh_vm_attack_command" {
     "DEMO=${aws_instance.fresh_vm[0].public_ip} bash vm_setup/attacks/run_from_laptop.sh" :
     "DEMO=${aws_instance.fresh_vm[0].public_ip} bash vm_setup/attacks/run_from_laptop.sh"
   ) : null
+}
+
+output "log_llm_model_s3_uri" {
+  description = "URI S3 du checkpoint Log LLM (sync EC2 app)."
+  value       = local.log_llm_model_s3_uri
+}
+
+output "deployment_summary" {
+  description = "Résumé post-déploiement (URLs principales)."
+  value = var.enable_ec2_app ? {
+    account_id       = data.aws_caller_identity.current.account_id
+    region           = var.aws_region
+    dashboard_url    = "http://${aws_instance.app[0].public_ip}:3000"
+    dashboard_alerts = "http://${aws_instance.app[0].public_ip}:3000/dashboard/alertes"
+    api_url          = "http://${aws_instance.app[0].public_ip}:8020"
+    health_url       = "http://${aws_instance.app[0].public_ip}:8020/health"
+    app_instance_id  = aws_instance.app[0].id
+    worker_instance_id = var.enable_ec2_worker ? aws_instance.predict_worker[0].id : null
+  } : null
 }
 
 # --- .env ---

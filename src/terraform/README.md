@@ -22,15 +22,13 @@ Infrastructure AWS par compte développeur (profil IAM local, clés jamais commi
 ```bash
 cp .env.example .env   # credentials + GIT_REPO_URL
 # Activer Bedrock Sonnet dans la console AWS
-./scripts/install.sh
+./deploy-all.sh
 ```
 
 **Terraform seul** (infra + `.env`, sans attendre les EC2) :
 
 ```bash
-cp src/terraform/terraform.tfvars.example src/terraform/terraform.tfvars
-chmod +x scripts/deploy-infra.sh
-./scripts/deploy-infra.sh
+./scripts/deploy-infra.sh -y
 ```
 
 Met à jour `.env` automatiquement via `terraform output env_snippet`.
@@ -39,17 +37,23 @@ Met à jour `.env` automatiquement via `terraform output env_snippet`.
 
 ```
 src/terraform/
+├── data.tf              # VPC / subnets / AMI partagés (EC2)
 ├── versions.tf          # Provider AWS + backend (commenté)
 ├── variables.tf         # Entrées (profil, région, noms…)
 ├── locals.tf            # Account ID, noms auto
 ├── s3.tf                # Buckets logs + prédictions
-├── dynamodb.tf          # Tables logs normalisés + alertes
+├── dynamodb.tf          # Tables logs normalisés + alertes + vm-registry
 ├── sqs.tf               # File SQS + notification S3 → worker
-├── outputs.tf           # Outputs + env_snippet
+├── ec2_app.tf           # API + frontend
+├── ec2_worker.tf        # Worker SQS/Bedrock
+├── ec2_demo_vm.tf       # VM capteur démo
+├── ec2_fresh_vm.tf      # VM fraîche vm_setup (optionnel)
+├── outputs.tf           # Outputs + env_snippet + deployment_summary
 ├── terraform.tfvars.example
 └── modules/
-    ├── s3-bucket/       # Bucket + chiffrement + versioning
-    └── dynamodb-table/  # Table pk/sk PAY_PER_REQUEST
+    ├── s3-bucket/
+    ├── dynamodb-table/
+    └── sqs-queue/
 ```
 
 ## Ressources créées

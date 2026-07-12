@@ -1,43 +1,11 @@
 # --- EC2 worker : git clone + Docker ---
 
-data "aws_vpc" "default" {
-  count = var.enable_ec2_worker ? 1 : 0
-
-  default = true
-}
-
-data "aws_subnets" "default" {
-  count = var.enable_ec2_worker ? 1 : 0
-
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default[0].id]
-  }
-}
-
-data "aws_ami" "amazon_linux_2023" {
-  count = var.enable_ec2_worker ? 1 : 0
-
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["al2023-ami-2023.*-kernel-6.1-x86_64"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
-
 resource "aws_security_group" "predict_worker" {
   count = var.enable_ec2_worker ? 1 : 0
 
   name        = "${var.project_name}-${local.account_suffix}-predict-worker"
   description = "SQS predict worker - egress only, admin via SSM"
-  vpc_id      = data.aws_vpc.default[0].id
+  vpc_id      = data.aws_vpc.default.id
 
   egress {
     from_port   = 0
@@ -144,9 +112,9 @@ resource "aws_iam_instance_profile" "predict_worker" {
 resource "aws_instance" "predict_worker" {
   count = var.enable_ec2_worker ? 1 : 0
 
-  ami                         = data.aws_ami.amazon_linux_2023[0].id
+  ami                         = data.aws_ami.amazon_linux_2023.id
   instance_type               = var.worker_instance_type
-  subnet_id                   = tolist(data.aws_subnets.default[0].ids)[0]
+  subnet_id                   = tolist(data.aws_subnets.default.ids)[0]
   vpc_security_group_ids      = [aws_security_group.predict_worker[0].id]
   iam_instance_profile        = aws_iam_instance_profile.predict_worker[0].name
   key_name                    = var.worker_key_name != "" ? var.worker_key_name : null

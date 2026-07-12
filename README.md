@@ -41,23 +41,26 @@ cp .env.example .env
 
 Console AWS → **Amazon Bedrock** → **Model access** → activer **Claude Sonnet 4.6** en `eu-west-3`.
 
-**3. Lancer l’installation**
+**3. Lancer le déploiement complet**
 
 ```bash
-chmod +x scripts/install.sh
-./scripts/install.sh
+chmod +x deploy-all.sh
+./deploy-all.sh
 ```
+
+(`./scripts/install.sh` est un alias.)
 
 Le script enchaîne automatiquement :
 
 ```
-Vérif AWS + Bedrock
-    → terraform apply (S3, DynamoDB×2, SQS, EC2 worker, EC2 app)
+Vérif AWS + VPC + Bedrock
+    → terraform apply (S3, DynamoDB×3, SQS, EC2 worker, EC2 app, VM démo)
     → sync .env
     → déploiement worker (Docker + SQS + Bedrock → DynamoDB alertes)
-    → déploiement app (API :8020 + frontend :3000)
+    → déploiement app (API :8020 + frontend :3000 + Log LLM optionnel)
     → upload demo.jsonl (optionnel)
-    → affiche les URLs du dashboard
+    → affiche l’URL du dashboard
+```
 ```
 
 Durée totale : **~15–25 min** (build Next.js sur EC2).

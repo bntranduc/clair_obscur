@@ -37,4 +37,6 @@ locals {
     var.sqs_queue_name != "" ? var.sqs_queue_name : null,
     "${var.project_name}-${local.account_suffix}-predict",
   )
+
+  log_llm_model_s3_uri = "s3://${local.predictions_bucket_name}/artifacts/log-llm/ckpt.pt"
 }

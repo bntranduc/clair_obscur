@@ -1,43 +1,11 @@
 # --- EC2 VM démo : capteur logs + cible d'attaques factices ---
 
-data "aws_vpc" "demo_vm" {
-  count = var.enable_ec2_demo_vm ? 1 : 0
-
-  default = true
-}
-
-data "aws_subnets" "demo_vm" {
-  count = var.enable_ec2_demo_vm ? 1 : 0
-
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.demo_vm[0].id]
-  }
-}
-
-data "aws_ami" "demo_vm_amazon_linux_2023" {
-  count = var.enable_ec2_demo_vm ? 1 : 0
-
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["al2023-ami-2023.*-kernel-6.1-x86_64"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
-
 resource "aws_security_group" "demo_vm" {
   count = var.enable_ec2_demo_vm ? 1 : 0
 
   name        = "${var.project_name}-${local.account_suffix}-demo-vm"
   description = "VM capteur - egress + nginx local 8080"
-  vpc_id      = data.aws_vpc.demo_vm[0].id
+  vpc_id      = data.aws_vpc.default.id
 
   ingress {
     description = "nginx demo (attaques locales / LAN)"
@@ -108,9 +76,9 @@ resource "aws_iam_instance_profile" "demo_vm" {
 resource "aws_instance" "demo_vm" {
   count = var.enable_ec2_demo_vm ? 1 : 0
 
-  ami                         = data.aws_ami.demo_vm_amazon_linux_2023[0].id
+  ami                         = data.aws_ami.amazon_linux_2023.id
   instance_type               = var.demo_vm_instance_type
-  subnet_id                   = tolist(data.aws_subnets.demo_vm[0].ids)[0]
+  subnet_id                   = tolist(data.aws_subnets.default.ids)[0]
   vpc_security_group_ids      = [aws_security_group.demo_vm[0].id]
   iam_instance_profile        = aws_iam_instance_profile.demo_vm[0].name
   associate_public_ip_address = true

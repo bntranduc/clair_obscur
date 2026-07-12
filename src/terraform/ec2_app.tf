@@ -1,43 +1,11 @@
 # --- EC2 app : API FastAPI + frontend Next.js (docker compose prod) ---
 
-data "aws_vpc" "app" {
-  count = var.enable_ec2_app ? 1 : 0
-
-  default = true
-}
-
-data "aws_subnets" "app" {
-  count = var.enable_ec2_app ? 1 : 0
-
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.app[0].id]
-  }
-}
-
-data "aws_ami" "app_amazon_linux_2023" {
-  count = var.enable_ec2_app ? 1 : 0
-
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["al2023-ami-2023.*-kernel-6.1-x86_64"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
-
 resource "aws_security_group" "app" {
   count = var.enable_ec2_app ? 1 : 0
 
   name        = "${var.project_name}-${local.account_suffix}-app"
   description = "API 8020 + frontend 3000"
-  vpc_id      = data.aws_vpc.app[0].id
+  vpc_id      = data.aws_vpc.default.id
 
   ingress {
     from_port   = 8020
@@ -155,9 +123,9 @@ resource "aws_iam_instance_profile" "app" {
 resource "aws_instance" "app" {
   count = var.enable_ec2_app ? 1 : 0
 
-  ami                         = data.aws_ami.app_amazon_linux_2023[0].id
+  ami                         = data.aws_ami.amazon_linux_2023.id
   instance_type               = var.app_instance_type
-  subnet_id                   = tolist(data.aws_subnets.app[0].ids)[0]
+  subnet_id                   = tolist(data.aws_subnets.default.ids)[0]
   vpc_security_group_ids      = [aws_security_group.app[0].id]
   iam_instance_profile        = aws_iam_instance_profile.app[0].name
   key_name                    = var.worker_key_name != "" ? var.worker_key_name : null
