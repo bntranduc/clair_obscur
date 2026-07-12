@@ -9,7 +9,9 @@ PREDICTION_PROMPT_TEMPLATE = """You are a SOC analyst assistant. Below are aggre
 
 IMPORTANT: If the aggregated incidents list is empty OR if you conclude there is no attack, DO NOT invent anything. In that case, return an EMPTY response (no JSON, no text).
 
-You must return a LIST of detections (JSON array). Include one detection per distinct attack campaign you believe is present (you may return 1..N items).
+If the aggregated incidents list is NON-EMPTY, you MUST return at least one detection in the JSON array. Never return an empty array `[]` when incidents are present.
+
+Return ONLY valid JSON — no markdown, no commentary, no reasoning text before or after the JSON.
 
 Each detection.detection.attack_type MUST be exactly one value from this closed list (copy the string verbatim):
 {types_list}

@@ -198,15 +198,26 @@ def predict_from_incidents(
         allowed_attack_types=allowed,
         detection_time_seconds=detection_time_seconds,
     )
-    raw = _bedrock_text(
-        prompt,
-        region=region,
-        model_id=model_id,
-        max_tokens=max_tokens,
-        profile_name=profile_name,
-        inline_credentials=dict(inline_aws_credentials) if inline_aws_credentials else None,
-    )
-    return _normalize_alerts(_extract_json_value(raw))
+    inline = dict(inline_aws_credentials) if inline_aws_credentials else None
+
+    def _run(extra: str = "") -> list[dict[str, Any]]:
+        raw = _bedrock_text(
+            prompt + extra,
+            region=region,
+            model_id=model_id,
+            max_tokens=max_tokens,
+            profile_name=profile_name,
+            inline_credentials=inline,
+        )
+        return _normalize_alerts(_extract_json_value(raw))
+
+    alerts = _run()
+    if aggregated_incidents and not alerts:
+        alerts = _run(
+            "\n\nREMINDER: incidents above are real and non-empty. "
+            "Return ONLY a JSON array with one detection per attack_type family. No prose."
+        )
+    return alerts
 
 
 def predict_alerts(
