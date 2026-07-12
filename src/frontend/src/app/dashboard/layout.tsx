@@ -13,7 +13,6 @@ import {
   ChevronsLeft,
   ChevronsRight,
   MessageCircle,
-  Network,
   Server,
 } from "lucide-react";
 import UserMenu from "@/components/UserMenu";
@@ -28,7 +27,6 @@ export default function DashboardLayout({
 }) {
   const pathname = usePathname();
   const isChatPage = pathname === "/dashboard/chat";
-  const isClustersPage = pathname === "/dashboard/clusters";
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarReady, setSidebarReady] = useState(false);
   const [assistantSheetOpen, setAssistantSheetOpen] = useState(false);
@@ -130,7 +128,6 @@ export default function DashboardLayout({
               icon={<LayoutDashboard size={18} strokeWidth={2} />}
               label="Analytics"
             />
-            <NavLink href="/dashboard/clusters" icon={<Network size={18} strokeWidth={2} />} label="Clusters" />
           </NavSection>
 
           <NavSection title="Données">
@@ -183,16 +180,14 @@ export default function DashboardLayout({
             className={
               isChatPage
                 ? "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden overscroll-y-contain px-0 pb-0 pt-0"
-                : isClustersPage
-                  ? "flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden overscroll-y-contain px-0 pb-0 pt-0"
-                  : "flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-y-contain px-5 pb-5 pt-[2.125rem] sm:px-6 sm:pb-6 sm:pt-[2.25rem] lg:px-8 lg:pb-8 lg:pt-[2.375rem]"
+                : "flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-y-contain px-5 pb-5 pt-[2.125rem] sm:px-6 sm:pb-6 sm:pt-[2.25rem] lg:px-8 lg:pb-8 lg:pt-[2.375rem]"
             }
           >
             {children}
           </div>
         </div>
 
-        {!isChatPage && !isClustersPage ? (
+        {!isChatPage ? (
           <button
             type="button"
             onClick={() => setAssistantSheetOpen(true)}

@@ -29,6 +29,9 @@ secrets.json
 *_secret_key*
 amazon_admin.txt
 **/amazon_admin.txt
+openrout_key.txt
+openrouter_key.txt
+**/openrout_key.txt
 
 # Terraform : état + variables locales (souvent account_id, profils)
 docker-compose.override.yml

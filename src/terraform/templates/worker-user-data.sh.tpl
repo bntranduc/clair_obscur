@@ -46,7 +46,6 @@ BEDROCK_MODEL_ID=${bedrock_model_id}
 BEDROCK_MAX_TOKENS=4096
 DYNAMODB_ALERTS_TABLE=${dynamodb_alerts_table}
 DYNAMODB_ALERTS_PK=${dynamodb_alerts_pk}
-RULES_DEMO_MODE=1
 EOF
 
 cat > /etc/systemd/system/clair-predict-worker.service <<'UNITEOF'

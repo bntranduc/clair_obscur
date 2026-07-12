@@ -4,6 +4,7 @@ set -euo pipefail
 
 APP_DIR="/opt/clair-obscur"
 ENV_FILE="/etc/clair-obscur/app.env"
+SECRETS_FILE="/etc/clair-obscur/secrets.env"
 BACKEND_IMAGE="clair-backend-api:latest"
 FRONTEND_IMAGE="clair-frontend:latest"
 
@@ -49,8 +50,13 @@ docker build -f src/frontend/Dockerfile \
 docker stop clair-backend clair-frontend 2>/dev/null || true
 docker rm clair-backend clair-frontend 2>/dev/null || true
 
+ENV_ARGS=(--env-file "$ENV_FILE")
+if [[ -f "$SECRETS_FILE" ]]; then
+  ENV_ARGS+=(--env-file "$SECRETS_FILE")
+fi
+
 docker run -d --name clair-backend \
-  --env-file "$ENV_FILE" \
+  "${ENV_ARGS[@]}" \
   -p 8020:8020 \
   --restart unless-stopped \
   "$BACKEND_IMAGE"

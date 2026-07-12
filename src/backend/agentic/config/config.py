@@ -140,7 +140,9 @@ class Config(BaseModel):
         errors: list[str] = []
 
         if not self.api_key:
-            errors.append("No API key found. Set API_KEY environment variable")
+            errors.append(
+                "No API key found. Set OPENROUTER_API_KEY, API_KEY, or LLM_API_KEY"
+            )
 
         if not self.cwd.exists():
             errors.append(f"Working directory does not exist: {self.cwd}")

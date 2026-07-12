@@ -16,10 +16,6 @@ fi
 cd "$APP_DIR"
 docker build -f src/backend/worker/Dockerfile -t "$IMAGE" .
 
-if [[ -f "$ENV_FILE" ]] && ! grep -q '^RULES_DEMO_MODE=' "$ENV_FILE" 2>/dev/null; then
-  echo "RULES_DEMO_MODE=1" >> "$ENV_FILE"
-fi
-
 cat > /etc/systemd/system/clair-predict-worker.service <<'UNITEOF'
 [Unit]
 Description=Clair Obscur SQS predict worker (Docker)
