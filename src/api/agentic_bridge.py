@@ -10,10 +10,16 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, AsyncIterable, AsyncIterator
 
+from api.chat_models import (
+    MODEL_LOCAL_LOG_LLM,
+    iter_local_log_llm_sse,
+    normalize_chat_model,
+)
+
 _MAX_TOOL_OUTPUT_CHARS = 48_000
 _MAX_SESSIONS = max(1, int(os.getenv("AGENTIC_MAX_SESSIONS", "200")))
 
-_sessions: "OrderedDict[str, Any]" = OrderedDict()
+_sessions: "OrderedDict[str, tuple[Any, str]]" = OrderedDict()
 _session_locks: dict[str, asyncio.Lock] = {}
 
 
@@ -52,18 +58,20 @@ async def _dispose_agent(agent: Any) -> None:
         pass
 
 
-async def _get_or_create_session_agent(conversation_id: str) -> Any:
+async def _get_or_create_session_agent(conversation_id: str, model: str) -> Any:
     from backend.agentic.agent.agent import Agent
     from backend.agentic.config.config import ApprovalPolicy
     from backend.agentic.config.loader import load_config
 
     if conversation_id in _sessions:
-        agent = _sessions.pop(conversation_id)
-        _sessions[conversation_id] = agent
-        return agent
+        agent, stored_model = _sessions.pop(conversation_id)
+        if stored_model == model:
+            _sessions[conversation_id] = (agent, model)
+            return agent
+        await _dispose_agent(agent)
 
     while len(_sessions) >= _MAX_SESSIONS:
-        evicted_id, old = _sessions.popitem(last=False)
+        evicted_id, (old, _) = _sessions.popitem(last=False)
         _session_locks.pop(evicted_id, None)
         await _dispose_agent(old)
 
@@ -71,7 +79,7 @@ async def _get_or_create_session_agent(conversation_id: str) -> Any:
     cfg.approval = ApprovalPolicy.AUTO
     agent = Agent(cfg)
     await agent.__aenter__()
-    _sessions[conversation_id] = agent
+    _sessions[conversation_id] = (agent, model)
     return agent
 
 
@@ -147,11 +155,19 @@ async def _yield_from(iterable: AsyncIterable[str]) -> AsyncIterator[str]:
 async def iter_agentic_sse(
     message: str,
     conversation_id: str | None = None,
+    model: str | None = None,
 ) -> AsyncIterator[str]:
     """Un tour agent ; lignes SSE ``data: {...}\\n\\n``."""
     from backend.agentic.agent.agent import Agent
     from backend.agentic.config.config import ApprovalPolicy
     from backend.agentic.config.loader import load_config
+
+    chat_model = normalize_chat_model(model)
+
+    if chat_model == MODEL_LOCAL_LOG_LLM:
+        async for line in iter_local_log_llm_sse(message):
+            yield line
+        return
 
     cid = (conversation_id or "").strip()
 
@@ -165,6 +181,6 @@ async def iter_agentic_sse(
 
     lock = _lock_for_session(cid)
     async with lock:
-        agent = await _get_or_create_session_agent(cid)
+        agent = await _get_or_create_session_agent(cid, chat_model)
         async for line in _yield_from(_merged_agent_turn_sse(agent, message, conversation_id=cid)):
             yield line

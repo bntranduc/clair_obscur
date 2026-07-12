@@ -175,13 +175,46 @@ function parseSseBlocks(buffer: string): { events: AgenticSsePayload[]; rest: st
   return { events, rest };
 }
 
+export type ChatModelOption = {
+  id: string;
+  label: string;
+  description: string;
+};
+
+export type ChatModelsResponse = {
+  models: ChatModelOption[];
+  default: string;
+};
+
+const CHAT_MODEL_STORAGE_KEY = "clair-obscur-chat-model";
+
+export function loadStoredChatModel(): string | null {
+  if (typeof window === "undefined") return null;
+  const v = localStorage.getItem(CHAT_MODEL_STORAGE_KEY);
+  return v?.trim() || null;
+}
+
+export function saveStoredChatModel(modelId: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(CHAT_MODEL_STORAGE_KEY, modelId);
+}
+
+export async function fetchChatModels(): Promise<ChatModelsResponse> {
+  const res = await fetch(`${getApiUrl()}/api/v1/agentic/models`, apiFetchInit);
+  if (!res.ok) {
+    throw new Error(`Chat models error ${res.status}`);
+  }
+  return res.json() as Promise<ChatModelsResponse>;
+}
+
 export async function streamAgenticChat(
   message: string,
   onEvent: (ev: AgenticSsePayload) => void,
-  options?: { signal?: AbortSignal; conversationId?: string },
+  options?: { signal?: AbortSignal; conversationId?: string; model?: string },
 ): Promise<void> {
-  const body: { message: string; conversation_id?: string } = { message };
+  const body: { message: string; conversation_id?: string; model?: string } = { message };
   if (options?.conversationId?.trim()) body.conversation_id = options.conversationId.trim();
+  if (options?.model?.trim()) body.model = options.model.trim();
 
   const res = await fetch(`${getApiUrl()}/api/v1/agentic/stream`, {
     ...apiFetchInit,

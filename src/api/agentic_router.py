@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from api.agentic_bridge import _repo_root, iter_agentic_sse
 from api.agent_catalog import build_agent_catalog
+from api.chat_models import list_chat_models, normalize_chat_model
 from backend.agentic.config.loader import load_config
 from backend.agentic.safety.web_approval import resolve as resolve_web_approval
 
@@ -21,6 +22,12 @@ async def get_agentic_catalog():
     return build_agent_catalog(cfg)
 
 
+@router.get("/models")
+async def get_chat_models():
+    """Modèles disponibles pour l'assistant (OpenRouter ou Log LLM local)."""
+    return {"models": list_chat_models(), "default": normalize_chat_model(None)}
+
+
 class AgenticStreamRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=32_000)
     conversation_id: str | None = Field(
@@ -28,14 +35,22 @@ class AgenticStreamRequest(BaseModel):
         max_length=128,
         description="Identifiant stable (session UI) pour la mémoire agent.",
     )
+    model: str | None = Field(
+        default=None,
+        max_length=64,
+        description="openrouter | local-log-llm",
+    )
 
 
 @router.post("/stream")
 async def stream_agentic(req: AgenticStreamRequest):
+    model = normalize_chat_model(req.model)
+
     async def event_gen():
         async for chunk in iter_agentic_sse(
             req.message.strip(),
             conversation_id=req.conversation_id,
+            model=model,
         ):
             yield chunk
 

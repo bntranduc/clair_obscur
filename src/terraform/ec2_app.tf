@@ -120,6 +120,15 @@ resource "aws_iam_role_policy" "app" {
         ]
       },
       {
+        Sid    = "S3PredictionsRead"
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:ListBucket"]
+        Resource = [
+          module.predictions.bucket_arn,
+          "${module.predictions.bucket_arn}/*",
+        ]
+      },
+      {
         Sid      = "BedrockInvoke"
         Effect   = "Allow"
         Action   = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]

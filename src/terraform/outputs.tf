@@ -197,6 +197,45 @@ output "demo_vm_run_attacks_command" {
   ) : null
 }
 
+# --- EC2 VM fraîche (test vm_setup) ---
+
+output "fresh_vm_instance_id" {
+  description = "ID EC2 VM fraîche (test connect.sh)."
+  value       = var.enable_ec2_fresh_vm ? aws_instance.fresh_vm[0].id : null
+}
+
+output "fresh_vm_public_ip" {
+  description = "IP publique VM fraîche."
+  value       = var.enable_ec2_fresh_vm ? aws_instance.fresh_vm[0].public_ip : null
+}
+
+output "fresh_vm_ssm_command" {
+  description = "Session SSM sur la VM fraîche."
+  value = var.enable_ec2_fresh_vm ? (
+    var.aws_profile != "" ?
+    "aws ssm start-session --target ${aws_instance.fresh_vm[0].id} --region ${var.aws_region} --profile ${var.aws_profile}" :
+    "aws ssm start-session --target ${aws_instance.fresh_vm[0].id} --region ${var.aws_region}"
+  ) : null
+}
+
+output "fresh_vm_connect_command" {
+  description = "Lance connect.sh sur la VM fraîche via SSM (approbation admin requise dans le dashboard)."
+  value = var.enable_ec2_fresh_vm && var.enable_ec2_app ? (
+    var.aws_profile != "" ?
+    "aws ssm send-command --instance-ids ${aws_instance.fresh_vm[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git fetch origin && git reset --hard origin/${var.worker_git_ref} && sudo vm_setup/connect.sh --api-url http://${aws_instance.app[0].public_ip}:8020 --install\"]' --region ${var.aws_region} --profile ${var.aws_profile}" :
+    "aws ssm send-command --instance-ids ${aws_instance.fresh_vm[0].id} --document-name AWS-RunShellScript --parameters 'commands=[\"cd /opt/clair-obscur && git fetch origin && git reset --hard origin/${var.worker_git_ref} && sudo vm_setup/connect.sh --api-url http://${aws_instance.app[0].public_ip}:8020 --install\"]' --region ${var.aws_region}"
+  ) : null
+}
+
+output "fresh_vm_attack_command" {
+  description = "Attaques factices sur VM fraîche (après connect.sh approuvé)."
+  value = var.enable_ec2_fresh_vm ? (
+    var.aws_profile != "" ?
+    "DEMO=${aws_instance.fresh_vm[0].public_ip} bash vm_setup/attacks/run_from_laptop.sh" :
+    "DEMO=${aws_instance.fresh_vm[0].public_ip} bash vm_setup/attacks/run_from_laptop.sh"
+  ) : null
+}
+
 # --- .env ---
 
 output "env_snippet" {

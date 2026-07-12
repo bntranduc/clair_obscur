@@ -29,5 +29,7 @@ sqs_visibility_timeout_seconds = 900
 # app_instance_type  = "t2.medium"
 # enable_ec2_demo_vm = true
 # demo_vm_instance_type = "t3.micro"
+# enable_ec2_fresh_vm = true   # VM vierge pour tester vm_setup/connect.sh
+# fresh_vm_instance_type = "t3.micro"
 # worker_bedrock_model_id = "eu.anthropic.claude-sonnet-4-6"
 # worker_key_name         = ""   # SSH optionnel ; sinon SSM Session Manager

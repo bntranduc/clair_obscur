@@ -50,8 +50,7 @@ cdk.out/
 *.auto.tfvars
 
 # Compose / overrides locaux avec secrets
-# Zip de handler Lambda généré localement (ex. ``cd src/backend/lambda/raw_logs_to_predict && zip …``)
-src/backend/lambda/**/*.zip
+# --- AWS (build local) ---
 
 # --- Python ---
 __pycache__/
@@ -90,6 +89,8 @@ coverage.xml
 *.joblib
 model.tar.gz
 **/model.tar.gz
+**/llm_from_scratch/**/ckpt.pt
+**/llm_from_scratch/checkpoint/
 
 # --- Exécution locale (serveur / scripts en arrière-plan) ---
 nohup.out

@@ -46,6 +46,7 @@ DYNAMODB_VMS_TABLE=${dynamodb_vms_table}
 ALERTS_SOURCE=dynamodb
 BEDROCK_MODEL_ID=${bedrock_model_id}
 API_PORT=8020
+LOG_LLM_MODEL_S3_URI=s3://${predictions_bucket}/artifacts/log-llm/ckpt.pt
 EOF
 
 chmod +x "$APP_DIR/scripts/ec2-refresh-app.sh"

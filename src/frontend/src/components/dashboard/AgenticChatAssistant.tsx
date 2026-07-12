@@ -16,7 +16,7 @@ import {
   ShieldAlert,
   X,
 } from "lucide-react";
-import { streamAgenticChat, submitAgenticApproval, type AgenticSsePayload } from "@/lib/api";
+import { streamAgenticChat, submitAgenticApproval, fetchChatModels, loadStoredChatModel, saveStoredChatModel, type AgenticSsePayload, type ChatModelOption } from "@/lib/api";
 import { ChatSessionSidebar } from "@/components/dashboard/ChatSessionSidebar";
 import { MarkdownMessage } from "@/components/dashboard/MarkdownMessage";
 import { AgenticVizChart, parseAgenticChartPayload } from "@/components/dashboard/AgenticVizChart";
@@ -259,6 +259,8 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
   const [streamError, setStreamError] = useState<string | null>(null);
   const [pendingApproval, setPendingApproval] = useState<PendingToolApproval | null>(null);
   const [approvalSubmitting, setApprovalSubmitting] = useState(false);
+  const [chatModels, setChatModels] = useState<ChatModelOption[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>("openrouter");
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -266,6 +268,24 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
     // Hydratation : état persistant localStorage après premier paint client.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- chargement one-shot au montage
     setStore(loadStore());
+    const stored = loadStoredChatModel();
+    if (stored) setSelectedModel(stored);
+    void fetchChatModels()
+      .then((data) => {
+        setChatModels(data.models);
+        const storedId = loadStoredChatModel();
+        const ids = new Set(data.models.map((m) => m.id));
+        if (storedId && ids.has(storedId)) {
+          setSelectedModel(storedId);
+        } else if (ids.has(data.default)) {
+          setSelectedModel(data.default);
+        } else if (data.models[0]) {
+          setSelectedModel(data.models[0].id);
+        }
+      })
+      .catch(() => {
+        setChatModels([{ id: "openrouter", label: "OpenRouter", description: "" }]);
+      });
   }, []);
 
   useEffect(() => {
@@ -625,7 +645,7 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
           handleEvent(ev, draftRun);
           pushRowUpdate();
         },
-        { signal: ac.signal, conversationId: sessionIdForTurn },
+        { signal: ac.signal, conversationId: sessionIdForTurn, model: selectedModel },
       );
     } catch (e) {
       if ((e as Error).name === 'AbortError') {
@@ -789,11 +809,41 @@ export default function AgenticChatAssistant({ variant = "page", onClose }: Agen
           <p className="text-gray-400 text-sm mt-1">
             Flux SSE · réflexion / étapes de boucle · session ={' '}
             <code className="text-blue-300/90">conversation_id</code> (mémoire agentic). Les actions à risque élevé
-            ouvrent une demande d’autorisation. Réflexion :
-            OpenRouter (
-            <code className="text-blue-300/80">AGENTIC_REASONING_EFFORT</code>, défaut <code className="text-blue-300/80">low</code>
-            ).
+            ouvrent une demande d’autorisation.
           </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <label htmlFor="chat-model-select" className="text-xs text-slate-500">
+              Modèle
+            </label>
+            <select
+              id="chat-model-select"
+              value={selectedModel}
+              disabled={busy}
+              onChange={(e) => {
+                const id = e.target.value;
+                setSelectedModel(id);
+                saveStoredChatModel(id);
+              }}
+              className="rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-1.5 text-sm text-slate-200 focus:border-blue-500 focus:outline-none disabled:opacity-50"
+            >
+              {(chatModels.length ? chatModels : [{ id: "openrouter", label: "OpenRouter", description: "" }]).map(
+                (m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ),
+              )}
+            </select>
+            {selectedModel === "local-log-llm" ? (
+              <span className="text-xs text-amber-300/90">Explication de logs — sans outils agent.</span>
+            ) : (
+              <span className="text-xs text-slate-500">
+                OpenRouter (
+                <code className="text-blue-300/80">AGENTIC_REASONING_EFFORT</code>, défaut{' '}
+                <code className="text-blue-300/80">low</code>).
+              </span>
+            )}
+          </div>
         </div>
 
         {streamError && (

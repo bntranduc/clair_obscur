@@ -40,6 +40,32 @@ if [[ -f "$ENV_FILE" ]]; then
 fi
 
 cd "$APP_DIR"
+
+# --- Log LLM local (explain API) ---
+LOG_LLM_IMAGE="clair-log-explain:latest"
+DOCKER_NET="clair-net"
+docker network create "$DOCKER_NET" 2>/dev/null || true
+
+if [[ -f "$APP_DIR/scripts/ec2-sync-log-llm-model.sh" ]]; then
+  bash "$APP_DIR/scripts/ec2-sync-log-llm-model.sh" || true
+fi
+
+EXPLAIN_ENV_ARGS=()
+if [[ -f "$APP_DIR/src/llm_from_scratch/model_prod/ckpt.pt" ]]; then
+  docker build -f src/llm_from_scratch/Dockerfile -t "$LOG_LLM_IMAGE" src/llm_from_scratch
+  docker stop clair-log-explain 2>/dev/null || true
+  docker rm clair-log-explain 2>/dev/null || true
+  docker run -d --name clair-log-explain \
+    --network "$DOCKER_NET" \
+    -p 127.0.0.1:8001:8000 \
+    --restart unless-stopped \
+    "$LOG_LLM_IMAGE"
+  EXPLAIN_ENV_ARGS=(-e "EXPLAIN_LLM_URL=http://clair-log-explain:8000")
+  echo "Log LLM: http://127.0.0.1:8001 (docker: clair-log-explain)"
+else
+  echo "Log LLM: model_prod/ckpt.pt absent — explain API non démarrée." >&2
+fi
+
 docker build -f src/api/Dockerfile -t "$BACKEND_IMAGE" .
 docker build -f src/frontend/Dockerfile \
   --build-arg "NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE}" \
@@ -57,6 +83,8 @@ fi
 
 docker run -d --name clair-backend \
   "${ENV_ARGS[@]}" \
+  "${EXPLAIN_ENV_ARGS[@]}" \
+  --network "$DOCKER_NET" \
   -p 8020:8020 \
   --restart unless-stopped \
   "$BACKEND_IMAGE"
@@ -74,6 +102,11 @@ for i in 1 2 3 4 5 6 7 8 9 10; do
   sleep 3
 done
 curl -sf "http://127.0.0.1:8020/health"
+echo ""
+if docker ps --format '{{.Names}}' | grep -q '^clair-log-explain$'; then
+  curl -sf "http://127.0.0.1:8001/health" && echo ""
+fi
+curl -sf "http://127.0.0.1:8020/api/v1/agentic/models" | head -c 300
 echo ""
 curl -sf "http://127.0.0.1:8020/api/v1/alerts" | head -c 200
 echo ""

@@ -183,3 +183,21 @@ variable "demo_vm_ingress_cidr_blocks" {
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }
+
+variable "enable_ec2_fresh_vm" {
+  description = "EC2 VM fraîche pour tester vm_setup/connect.sh (sans agent préinstallé)."
+  type        = bool
+  default     = true
+}
+
+variable "fresh_vm_instance_type" {
+  description = "Type d'instance pour la VM fraîche vm_setup."
+  type        = string
+  default     = "t3.micro"
+}
+
+variable "fresh_vm_ingress_cidr_blocks" {
+  description = "CIDR autorises sur nginx 8080 (VM fraîche)."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
