@@ -49,7 +49,8 @@ def main() -> int:
                     raise
             except RuntimeError as e:
                 print(f"LLM error: {e}", file=sys.stderr)
-                raise
+                print("message left for retry after visibility timeout", file=sys.stderr)
+                time.sleep(2)
             except urllib.error.HTTPError as e:
                 print(e.read().decode("utf-8", errors="replace"), file=sys.stderr)
                 print("HTTP error, message left for retry", file=sys.stderr)

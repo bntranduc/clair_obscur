@@ -9,7 +9,11 @@ from typing import Any
 import boto3
 from botocore.config import Config
 
-_BEDROCK_CONFIG = Config(retries={"max_attempts": 5, "mode": "standard"})
+_BEDROCK_CONFIG = Config(
+    retries={"max_attempts": 5, "mode": "standard"},
+    read_timeout=300,
+    connect_timeout=10,
+)
 
 
 class AwsClient:
