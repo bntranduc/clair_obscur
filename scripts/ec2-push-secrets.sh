@@ -33,7 +33,7 @@ ESCAPED_KEY="${KEY//\'/\'\\\'\'}"
 CMD_ID="$(aws ssm send-command \
   --instance-ids "$INSTANCE_ID" \
   --document-name AWS-RunShellScript \
-  --parameters "commands=[\"mkdir -p /etc/clair-obscur && printf '%s\\n' 'OPENROUTER_API_KEY=${ESCAPED_KEY}' 'OPENROUTER_BASE_URL=https://openrouter.ai/api/v1' > /etc/clair-obscur/secrets.env && chmod 600 /etc/clair-obscur/secrets.env && cd /opt/clair-obscur && git pull && bash scripts/ec2-refresh-app.sh\"]" \
+  --parameters "commands=[\"mkdir -p /etc/clair-obscur && printf '%s\\n' 'OPENROUTER_API_KEY=${ESCAPED_KEY}' 'OPENROUTER_BASE_URL=https://openrouter.ai/api/v1' > /etc/clair-obscur/secrets.env && chmod 600 /etc/clair-obscur/secrets.env && cd /opt/clair-obscur && git fetch origin && git reset --hard origin/main && bash scripts/ec2-refresh-app.sh\"]" \
   --region "$REGION" \
   --profile "$PROFILE" \
   --query Command.CommandId \

@@ -67,6 +67,12 @@ docker run -d --name clair-frontend \
   "$FRONTEND_IMAGE"
 
 docker ps --filter name=clair-
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  if curl -sf "http://127.0.0.1:8020/health" >/dev/null; then
+    break
+  fi
+  sleep 3
+done
 curl -sf "http://127.0.0.1:8020/health"
 echo ""
 curl -sf "http://127.0.0.1:8020/api/v1/alerts" | head -c 200
