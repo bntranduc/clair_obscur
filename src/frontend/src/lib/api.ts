@@ -12,6 +12,20 @@ function getApiUrl(): string {
 /** Même origine CORS que l’API (``allow_credentials=False`` → pas de cookies cross-origin). */
 const apiFetchInit: RequestInit = { cache: "no-store", credentials: "omit" };
 
+/** Pagination offset (S3 raw-logs via API — bucket / préfixe lus côté serveur). */
+export type NormalizedLogsS3Page = {
+  items: NormalizedEvent[];
+  has_more: boolean;
+  skip: number;
+  limit: number;
+};
+
+export type FetchNormalizedLogsS3Options = {
+  raw_logs_bucket?: string;
+  raw_logs_prefix?: string;
+  region?: string;
+};
+
 /** Pagination par curseur (DynamoDB) — pas de clés AWS dans l’URL. */
 export type NormalizedLogsDynamoPage = {
   items: NormalizedEvent[];
@@ -31,6 +45,36 @@ function dynamoPkFromEnv(): string | undefined {
   if (typeof process === "undefined" || !process.env?.NEXT_PUBLIC_DYNAMODB_PK) return undefined;
   const v = process.env.NEXT_PUBLIC_DYNAMODB_PK.trim();
   return v || undefined;
+}
+
+/** Logs normalisés depuis le bucket S3 raw-logs (``RAW_LOGS_BUCKET`` / ``RAW_LOGS_PREFIX`` côté API). */
+export async function fetchNormalizedLogsFromS3(
+  params: { skip?: number; limit?: number },
+  options?: FetchNormalizedLogsS3Options,
+): Promise<NormalizedLogsS3Page> {
+  const sp = new URLSearchParams();
+  sp.set("skip", String(params.skip ?? 0));
+  sp.set("limit", String(params.limit ?? 50));
+  if (options?.raw_logs_bucket?.trim()) sp.set("raw_logs_bucket", options.raw_logs_bucket.trim());
+  if (options?.raw_logs_prefix?.trim()) sp.set("raw_logs_prefix", options.raw_logs_prefix.trim());
+  if (options?.region?.trim()) sp.set("region", options.region.trim());
+  const q = sp.toString();
+  const url = `${getApiUrl()}/api/v1/logs/normalized${q ? `?${q}` : ""}`;
+  const res = await fetch(url, apiFetchInit);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let detail = text;
+    try {
+      const j = JSON.parse(text) as { detail?: unknown };
+      if (typeof j.detail === "string") detail = j.detail;
+      else if (Array.isArray(j.detail))
+        detail = j.detail.map((x: unknown) => (typeof x === "string" ? x : JSON.stringify(x))).join("; ");
+    } catch {
+      /* keep raw */
+    }
+    throw new Error(`GET /api/v1/logs/normalized failed (${res.status}): ${String(detail).slice(0, 800)}`.trim());
+  }
+  return (await res.json()) as NormalizedLogsS3Page;
 }
 
 export async function fetchNormalizedLogsFromDynamodb(

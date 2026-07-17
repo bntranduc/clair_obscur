@@ -95,6 +95,8 @@ def health() -> dict[str, Any]:
         "alerts_source": alerts_source,
         "alerts_path": str(alerts_json_path()) if alerts_source == "file" else None,
         "predictions_bucket": (os.getenv("PREDICTIONS_BUCKET") or os.getenv("OUTPUT_BUCKET") or "").strip() or None,
+        "raw_logs_bucket": (os.getenv("RAW_LOGS_BUCKET") or "").strip() or None,
+        "raw_logs_prefix": (os.getenv("RAW_LOGS_PREFIX") or "").strip() or None,
         "local_logs_dir": str(local) if local else None,
         "dynamodb_table": (os.getenv("DYNAMODB_TABLE") or "").strip() or None,
         "dynamodb_alerts_table": (os.getenv("DYNAMODB_ALERTS_TABLE") or "").strip() or None,
